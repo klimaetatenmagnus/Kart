@@ -42,7 +42,7 @@ jobs:
         run: |
           docker build \
             -f apps/admin/Dockerfile \
-            --build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
+            --build-arg VITE_API_URL=https://klimaoslo-kart-api-412468299057.europe-west1.run.app \
             --build-arg VITE_AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }} \
             --build-arg VITE_AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
             -t ${{ env.REGISTRY }}/admin:${{ github.sha }} \
