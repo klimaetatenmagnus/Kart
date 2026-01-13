@@ -1272,6 +1272,34 @@ gcloud beta run domain-mappings describe \
 
 **Status:** [ ] Ikke startet
 
+### 7.4 Oppdater GitHub Actions workflows med custom domains
+
+⚠️ **VIKTIG:** Når DNS er konfigurert og verifisert, må GitHub Actions workflows oppdateres til å bruke custom domains.
+
+**Nåværende konfigurasjon (midlertidig):**
+Workflows bruker Cloud Run URL-er fordi custom domains ikke er konfigurert ennå:
+- `VITE_API_URL=https://klimaoslo-kart-api-412468299057.europe-west1.run.app`
+
+**Når DNS er klart, endre til:**
+
+1. Oppdater `.github/workflows/deploy-admin.yml`:
+```yaml
+--build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
+```
+
+2. Oppdater `.github/workflows/deploy-widget.yml`:
+```yaml
+--build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
+```
+
+3. Trigger manuell deployment:
+```bash
+gh workflow run "Deploy Admin"
+gh workflow run "Deploy Widget"
+```
+
+**Status:** [ ] Ikke startet (venter på DNS-konfigurasjon)
+
 ---
 
 ## Fase 8: CI/CD med GitHub Actions
