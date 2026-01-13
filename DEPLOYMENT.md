@@ -12,7 +12,7 @@
 9. [Fase 5: Cloud Run deployment](#fase-5-cloud-run-deployment)
 10. [Fase 6: Cloud Scheduler og Functions](#fase-6-cloud-scheduler-og-functions)
 11. [Fase 7: Domene og SSL](#fase-7-domene-og-ssl)
-12. [Fase 8: CI/CD med Cloud Build](#fase-8-cicd-med-cloud-build)
+12. [Fase 8: CI/CD med GitHub Actions](#fase-8-cicd-med-github-actions)
 13. [Fase 9: Azure AD for produksjon](#fase-9-azure-ad-for-produksjon)
 14. [Fase 10: Verifisering og lansering](#fase-10-verifisering-og-lansering)
 15. [Neste steg](#neste-steg)
@@ -73,7 +73,7 @@ Fase 4:  Dockerfiler            [##########] 100% - FULLFORT
 Fase 5:  Cloud Run              [##########] 100% - FULLFORT - Alle tjenester deployet!
 Fase 6:  Scheduler/Functions    [#####     ] 50%  - Kode opprettet, deployment gjenstår
 Fase 7:  Domene og SSL          [          ] 0%   - Krever DNS-tilgang
-Fase 8:  CI/CD                  [#####     ] 50%  - cloudbuild.yaml opprettet, trigger gjenstår
+Fase 8:  CI/CD (GitHub Actions) [##########] 100% - FULLFØRT - Selektiv deployment konfigurert
 Fase 9:  Azure AD               [          ] 0%   - Krever Azure-tilgang
 Fase 10: Verifisering           [######    ] 60%  - Widget og Admin testet, migrering gjenstår
 ```
@@ -118,6 +118,10 @@ Fase 10: Verifisering           [######    ] 60%  - Widget og Admin testet, migr
 | 2026-01-13 | **InfoWindow via backend API** | Fullført | Widget henter detaljer fra backend i stedet for frontend Places SDK |
 | 2026-01-13 | `/api/public/places/details` utvidet | Fullført | Inkluderer nå telefon, nettside, åpningstider, bilder |
 | 2026-01-13 | Bilde-URL generering | Fullført | Backend genererer Google Places Photo URL-er |
+| 2026-01-13 | **GitHub repo opprettet** | Fullført | https://github.com/klimaetatenmagnus/Kart |
+| 2026-01-13 | **GitHub Actions workflows** | Fullført | Selektiv deployment med path-filtre |
+| 2026-01-13 | **Workload Identity Federation** | Fullført | GitHub Actions → GCP autentisering uten nøkkelfiler |
+| 2026-01-13 | **GitHub Secrets konfigurert** | Fullført | WIF, Maps API-nøkkel, Azure placeholders |
 | | | | |
 
 ---
@@ -1270,148 +1274,173 @@ gcloud beta run domain-mappings describe \
 
 ---
 
-## Fase 8: CI/CD med Cloud Build
+## Fase 8: CI/CD med GitHub Actions
 
-### 8.1 Opprett cloudbuild.yaml
+Vi bruker **GitHub Actions** med **Workload Identity Federation** for sikker, nøkkelfri autentisering mot Google Cloud. Dette gir selektiv deployment basert på hvilke filer som endres.
 
-Opprett `cloudbuild.yaml` i prosjekt-root:
+### 8.1 GitHub Repository
 
-```yaml
-steps:
-  # Bygg og push backend
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-f'
-      - 'apps/backend/Dockerfile'
-      - '-t'
-      - '${_REGISTRY}/api:$COMMIT_SHA'
-      - '-t'
-      - '${_REGISTRY}/api:latest'
-      - '.'
-    id: 'build-backend'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_REGISTRY}/api:$COMMIT_SHA']
-    id: 'push-backend'
-    waitFor: ['build-backend']
-
-  # Bygg og push admin
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-f'
-      - 'apps/admin/Dockerfile'
-      - '--build-arg'
-      - 'VITE_API_URL=https://api.kart.klimaoslo.no'
-      - '--build-arg'
-      - 'VITE_AZURE_CLIENT_ID=${_AZURE_CLIENT_ID}'
-      - '--build-arg'
-      - 'VITE_AZURE_TENANT_ID=${_AZURE_TENANT_ID}'
-      - '-t'
-      - '${_REGISTRY}/admin:$COMMIT_SHA'
-      - '-t'
-      - '${_REGISTRY}/admin:latest'
-      - '.'
-    id: 'build-admin'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_REGISTRY}/admin:$COMMIT_SHA']
-    id: 'push-admin'
-    waitFor: ['build-admin']
-
-  # Bygg og push widget
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-f'
-      - 'apps/widget/Dockerfile'
-      - '--build-arg'
-      - 'VITE_API_URL=https://api.kart.klimaoslo.no'
-      - '--build-arg'
-      - 'VITE_GOOGLE_MAPS_API_KEY=${_MAPS_API_KEY}'
-      - '-t'
-      - '${_REGISTRY}/widget:$COMMIT_SHA'
-      - '-t'
-      - '${_REGISTRY}/widget:latest'
-      - '.'
-    id: 'build-widget'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_REGISTRY}/widget:$COMMIT_SHA']
-    id: 'push-widget'
-    waitFor: ['build-widget']
-
-  # Deploy til Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      - 'run'
-      - 'deploy'
-      - 'klimaoslo-kart-api'
-      - '--image=${_REGISTRY}/api:$COMMIT_SHA'
-      - '--region=europe-west1'
-      - '--platform=managed'
-    id: 'deploy-backend'
-    waitFor: ['push-backend']
-
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      - 'run'
-      - 'deploy'
-      - 'klimaoslo-kart-admin'
-      - '--image=${_REGISTRY}/admin:$COMMIT_SHA'
-      - '--region=europe-west1'
-      - '--platform=managed'
-    id: 'deploy-admin'
-    waitFor: ['push-admin']
-
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      - 'run'
-      - 'deploy'
-      - 'klimaoslo-kart-widget'
-      - '--image=${_REGISTRY}/widget:$COMMIT_SHA'
-      - '--region=europe-west1'
-      - '--platform=managed'
-    id: 'deploy-widget'
-    waitFor: ['push-widget']
-
-substitutions:
-  _REGISTRY: europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart
-  _AZURE_CLIENT_ID: ''  # Settes i trigger
-  _AZURE_TENANT_ID: ''  # Settes i trigger
-  _MAPS_API_KEY: ''     # Settes i trigger
-
-options:
-  logging: CLOUD_LOGGING_ONLY
-
-images:
-  - '${_REGISTRY}/api:$COMMIT_SHA'
-  - '${_REGISTRY}/admin:$COMMIT_SHA'
-  - '${_REGISTRY}/widget:$COMMIT_SHA'
-```
-
-**Status:** [x] Fullfort
-
-### 8.2 Opprett Cloud Build trigger
+**Repository:** https://github.com/klimaetatenmagnus/Kart
 
 ```bash
-# Koble til Git-repository (krever manuell godkjenning i Console)
-gcloud builds triggers create github \
-  --name="klimaoslo-kart-deploy" \
-  --repo-owner="GITHUB_ORG" \
-  --repo-name="klimaoslo-kart" \
-  --branch-pattern="^main$" \
-  --build-config="cloudbuild.yaml" \
-  --substitutions="_AZURE_CLIENT_ID=xxx,_AZURE_TENANT_ID=xxx,_MAPS_API_KEY=xxx"
+# Klone repository
+git clone https://github.com/klimaetatenmagnus/Kart.git
+
+# Eller legg til remote til eksisterende prosjekt
+git remote add origin https://github.com/klimaetatenmagnus/Kart.git
 ```
 
-**Alternativt:** Opprett trigger manuelt i Cloud Console under Cloud Build > Triggers.
+**Status:** [x] Fullført
 
-**Status:** [ ] Ikke startet
+### 8.2 Selektiv deployment med path-filtre
+
+Tre separate GitHub Actions workflows sørger for at kun relevante tjenester bygges og deployes:
+
+| Workflow | Fil | Trigges av endringer i |
+|----------|-----|------------------------|
+| Deploy Backend | `.github/workflows/deploy-backend.yml` | `apps/backend/**`, `packages/shared/**` |
+| Deploy Admin | `.github/workflows/deploy-admin.yml` | `apps/admin/**`, `packages/shared/**` |
+| Deploy Widget | `.github/workflows/deploy-widget.yml` | `apps/widget/**`, `packages/shared/**` |
+
+**Fordeler:**
+- Endrer du kun backend-kode → kun API deployes
+- Endrer du `packages/shared` → alle tre tjenester deployes
+- Raskere builds og lavere kostnader
+
+**Status:** [x] Fullført
+
+### 8.3 Workload Identity Federation
+
+GitHub Actions autentiserer mot Google Cloud via OIDC tokens, uten behov for service account-nøkkelfiler.
+
+**Opprettet i GCP:**
+
+| Ressurs | Navn/ID |
+|---------|---------|
+| Workload Identity Pool | `github-actions` |
+| OIDC Provider | `github-provider` |
+| Service Account | `github-actions-deployer@bruktbutikk-navn.iam.gserviceaccount.com` |
+
+**Service Account-rettigheter:**
+- `roles/run.admin` - Deploy til Cloud Run
+- `roles/artifactregistry.writer` - Push Docker images
+- `roles/iam.serviceAccountUser` - Bruke andre service accounts
+
+**Sikkerhetsfilter:** Kun repositories under `klimaetatenmagnus` kan autentisere.
+
+**Status:** [x] Fullført
+
+### 8.4 GitHub Secrets
+
+Følgende secrets er konfigurert i GitHub repository settings:
+
+| Secret | Beskrivelse | Status |
+|--------|-------------|--------|
+| `WIF_PROVIDER` | Workload Identity Provider-sti | ✅ Konfigurert |
+| `WIF_SERVICE_ACCOUNT` | Service account email | ✅ Konfigurert |
+| `MAPS_API_KEY` | Google Maps API-nøkkel | ✅ Konfigurert |
+| `AZURE_CLIENT_ID` | Azure AD Client ID | ⏳ Placeholder |
+| `AZURE_TENANT_ID` | Azure AD Tenant ID | ⏳ Placeholder |
+
+**Oppdater Azure-secrets når klart:**
+
+```bash
+gh secret set AZURE_CLIENT_ID --repo="klimaetatenmagnus/Kart" --body="din-client-id"
+gh secret set AZURE_TENANT_ID --repo="klimaetatenmagnus/Kart" --body="din-tenant-id"
+```
+
+**Status:** [x] Fullført (Azure-verdier må oppdateres når tilgjengelig)
+
+### 8.5 Workflow-eksempel (Backend)
+
+```yaml
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/backend/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+
+      - name: Build and push
+        run: |
+          docker build -f apps/backend/Dockerfile \
+            -t europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/api:${{ github.sha }} \
+            .
+          docker push europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/api:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy klimaoslo-kart-api \
+            --image europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/api:${{ github.sha }} \
+            --region europe-west1 \
+            --platform managed
+```
+
+### 8.6 Manuell deployment (alternativ)
+
+Hvis du trenger å deploye manuelt uten GitHub Actions:
+
+```bash
+# Backend
+docker build -f apps/backend/Dockerfile -t europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/api:latest .
+docker push europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/api:latest
+gcloud run deploy klimaoslo-kart-api --image=europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/api:latest --region=europe-west1
+
+# Admin
+docker build -f apps/admin/Dockerfile \
+  --build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
+  --build-arg VITE_AZURE_CLIENT_ID=xxx \
+  --build-arg VITE_AZURE_TENANT_ID=xxx \
+  -t europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/admin:latest .
+docker push europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/admin:latest
+gcloud run deploy klimaoslo-kart-admin --image=europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/admin:latest --region=europe-west1
+
+# Widget
+docker build -f apps/widget/Dockerfile \
+  --build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
+  --build-arg VITE_GOOGLE_MAPS_API_KEY=xxx \
+  -t europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/widget:latest .
+docker push europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/widget:latest
+gcloud run deploy klimaoslo-kart-widget --image=europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart/widget:latest --region=europe-west1
+```
+
+### 8.7 Verifiser deployment
+
+```bash
+# Sjekk GitHub Actions-status
+gh run list --repo klimaetatenmagnus/Kart
+
+# Sjekk Cloud Run-tjenester
+gcloud run services list --region=europe-west1
+
+# Se logger for en spesifikk workflow-kjøring
+gh run view <run-id> --repo klimaetatenmagnus/Kart --log
+```
+
+**Status:** [x] Fullført
 
 ---
 
@@ -1608,13 +1637,13 @@ Til:
 | Cloud Run deploy | Dockerfiler, Artifact Registry | |
 | Domene-mapping | DNS-tilgang | Hvem administrerer klimaoslo.no DNS? |
 | Azure AD | App-registrering i Oslo kommune tenant | Tilgang til Azure AD |
-| CI/CD | GitHub repo, Cloud Build trigger | Repo-tilgang |
+| CI/CD | ~~GitHub repo, Cloud Build trigger~~ | ✅ Fullført |
 
 ### Sporsmal som ma avklares
 
 1. **DNS-administrasjon:** Hvem har tilgang til a opprette DNS-records for klimaoslo.no?
 2. **Azure AD:** Har du tilgang til a registrere apper i Oslo kommune sin Azure AD tenant?
-3. **GitHub:** Skal koden ligge i et eksisterende repo, eller opprettes nytt?
+3. ~~**GitHub:** Skal koden ligge i et eksisterende repo, eller opprettes nytt?~~ ✅ https://github.com/klimaetatenmagnus/Kart
 4. **Backup:** Onskes automatisk backup av Firestore-data?
 
 ---
@@ -1714,4 +1743,4 @@ gcloud run services logs read klimaoslo-kart-api --region=europe-west1 --limit=1
 
 ---
 
-*Sist oppdatert: 2026-01-13 (InfoWindow via backend API, bilde-URL generering)*
+*Sist oppdatert: 2026-01-13 (GitHub Actions med Workload Identity Federation, selektiv deployment)*
