@@ -3,6 +3,7 @@ import { createRoot, Root } from 'react-dom/client'
 import { Loader } from '@googlemaps/js-api-loader'
 import { PktCheckbox } from '@oslokommune/punkt-react'
 import { InfoWindowContent } from './InfoWindowContent'
+import { Legend } from './Legend'
 import type { KartinstansDTO, StedDTO, PlaceDetails } from '@klimaoslo-kart/shared'
 
 // Punkt designsystem mørkeblå farge - brukes for steder uten kategori
@@ -232,6 +233,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
             disabled={openNowLoading}
           />
         </div>
+      )}
+      {kartinstans.kategorier.length > 0 && (
+        <Legend kategorier={kartinstans.kategorier} />
       )}
     </div>
   )

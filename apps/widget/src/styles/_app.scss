@@ -410,6 +410,79 @@ body {
 }
 
 // ===========================================
+// Legend (kategoriforklaring)
+// ===========================================
+
+.map-legend {
+  position: absolute;
+  bottom: var(--pkt-spacing-24);
+  left: var(--pkt-spacing-16);
+  background: #{map.get(pkt.$pkt-colors, "brand-neutrals-white")};
+  padding: #{map.get(pkt.$spacing, "size-12")} #{map.get(pkt.$spacing, "size-16")};
+  border: 2px solid #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
+  box-shadow: #{map.get(pkt.$box-shadow, "medium")};
+  z-index: 100;
+  max-width: 200px;
+
+  &__title {
+    margin: 0 0 #{map.get(pkt.$spacing, "size-8")} 0;
+    color: #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: #{map.get(pkt.$spacing, "size-4")};
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: #{map.get(pkt.$spacing, "size-8")};
+  }
+
+  &__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+  }
+
+  &__label {
+    color: var(--text-color);
+    line-height: 1.4;
+  }
+}
+
+// Legend responsiv - skjul på mobil for å spare plass
+@include bp('mobile') {
+  .map-legend {
+    bottom: var(--pkt-spacing-8);
+    left: var(--pkt-spacing-8);
+    padding: #{map.get(pkt.$spacing, "size-8")} #{map.get(pkt.$spacing, "size-12")};
+    max-width: 160px;
+
+    &__title {
+      @include get-text("pkt-txt-12-medium");
+      margin-bottom: #{map.get(pkt.$spacing, "size-4")};
+    }
+
+    &__label {
+      @include get-text("pkt-txt-12");
+    }
+
+    &__dot {
+      width: 10px;
+      height: 10px;
+    }
+  }
+}
+
+// ===========================================
 // Tips Button (PktButton med posisjonering)
 // ===========================================
 
