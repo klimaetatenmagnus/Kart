@@ -6,8 +6,6 @@ Selvhostet kartløsning for [KlimaOslo.no](https://klimaoslo.no) - Oslo kommunes
 
 Kartplattformen lar redaksjonen opprette interaktive kart med steder hentet fra Google Places. Kartene bygges inn som iframes på klimaoslo.no og viser f.eks. gjenbruksbutikker, byttehyller, verksteder og andre bærekraftige tilbud i Oslo.
 
-**Eksempel:** [Gjenbrukskartet](https://klimaoslo.no/gjenbrukskartet) - Finn bruktbutikker og byttehyller i Oslo
-
 ## Funksjoner
 
 - **Admin-verktøy** - Opprett og rediger kartinstanser, legg til steder, håndter tips fra brukere
