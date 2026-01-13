@@ -1,0 +1,110 @@
+import { useState, useEffect } from 'react'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { PktButton } from '@oslokommune/punkt-react'
+import { apiFetch } from '../services/api'
+
+const skipAuth = import.meta.env.VITE_SKIP_AUTH === 'true'
+const devUserName = import.meta.env.VITE_DEV_USER_NAME || 'Developer'
+
+export function Layout() {
+  // I utviklingsmodus: vis dev-bruker
+  // I produksjon: hent fra MSAL
+  const userName = devUserName
+  const [nyeTipsCount, setNyeTipsCount] = useState<number>(0)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Sjekk om vi er på en kartinstans-editor side
+  const isOnEditorPage = location.pathname.startsWith('/kart/')
+
+  useEffect(() => {
+    const fetchNyeTips = async () => {
+      try {
+        const response = await apiFetch('/api/tips')
+        if (response.ok) {
+          const data = await response.json()
+          const tips = data.data || []
+          const nyeCount = tips.filter((t: { status: string }) => t.status === 'ny').length
+          setNyeTipsCount(nyeCount)
+        }
+      } catch {
+        // Ignorer feil - vis bare ikke tallet
+      }
+    }
+    fetchNyeTips()
+  }, [])
+
+  const handleLogout = () => {
+    if (skipAuth) {
+      // I development: bare refresh
+      window.location.reload()
+    } else {
+      // I produksjon: MSAL logout
+      try {
+        const { useMsal } = require('@azure/msal-react')
+        const { instance } = useMsal()
+        instance.logoutRedirect()
+      } catch {
+        window.location.reload()
+      }
+    }
+  }
+
+  return (
+    <div className="layout">
+      <header className="header">
+        <div className="header-left">
+          <Link to="/" className="logo">
+            <img
+              src="https://www.klimaoslo.no/wp-content/uploads/sites/2/2025/02/Oslo-logo-sort-RGB.png"
+              alt="Oslo kommune"
+              height="48"
+            />
+          </Link>
+          <h1>KlimaOslo Kartadmin</h1>
+          {skipAuth && <span className="dev-badge">DEV</span>}
+        </div>
+        <div className="header-right">
+          <span className="user-name">{userName}</span>
+          <PktButton
+            onClick={handleLogout}
+            skin="secondary"
+            size="small"
+          >
+            Logg ut
+          </PktButton>
+        </div>
+      </header>
+
+      <nav className="nav">
+        <Link to="/" className="nav-link">
+          Dashboard
+        </Link>
+        <Link to="/tips" className="nav-link">
+          Tips fra brukere{nyeTipsCount > 0 && ` (${nyeTipsCount})`}
+        </Link>
+        {isOnEditorPage && (
+          <div className="nav-right">
+            <PktButton
+              skin="secondary"
+              size="small"
+              variant="icon-left"
+              iconName="arrow-return"
+              onClick={() => navigate('/')}
+            >
+              <span>Tilbake</span>
+            </PktButton>
+          </div>
+        )}
+      </nav>
+
+      <main className="main">
+        <Outlet />
+      </main>
+
+      <footer className="footer">
+        <p>&copy; {new Date().getFullYear()} Oslo kommune - KlimaOslo</p>
+      </footer>
+    </div>
+  )
+}

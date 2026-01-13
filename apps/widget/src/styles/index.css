@@ -1,0 +1,640 @@
+/**
+ * KlimaOslo Kartwidget - Hovedstiler
+ * Basert pa eksisterende Gjenbrukskartet.html
+ */
+
+:root {
+  --primary-color: #002855;
+  --hover-color: #005A9C;
+  --active-color: #001F3F;
+  --accent-color: #034B45;
+  --neutral-border: #CCCCCC;
+  --background-light: #F9F9F9;
+  --text-color: #333333;
+  --spacing-small: 8px;
+  --spacing-medium: 16px;
+  --spacing-large: 24px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'OsloSans', Arial, sans-serif;
+  color: var(--text-color);
+}
+
+.kart-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.kart-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+  padding: var(--spacing-medium);
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.logo-container img {
+  height: 48px;
+}
+
+.kart-header h1 {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+  padding: var(--spacing-medium);
+  background: #fff;
+  border-bottom: 1px solid var(--neutral-border);
+  flex-wrap: wrap;
+}
+
+.search-container {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: var(--spacing-medium);
+  font-size: 16px;
+  border: 1px solid var(--neutral-border);
+  border-radius: 5px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 40, 85, 0.1);
+}
+
+/* Søkedropdown med autocomplete */
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--neutral-border);
+  border-top: none;
+  border-radius: 0 0 5px 5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.search-section {
+  border-bottom: 1px solid #eee;
+}
+
+.search-section:last-child {
+  border-bottom: none;
+}
+
+.search-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-small);
+  padding: var(--spacing-small) var(--spacing-medium);
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--background-light);
+}
+
+.search-section-icon {
+  font-size: 14px;
+}
+
+.search-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--spacing-small) var(--spacing-medium);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.search-suggestion:hover {
+  background: var(--background-light);
+}
+
+.search-suggestion:focus {
+  outline: none;
+  background: #e0e7ef;
+}
+
+.suggestion-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.suggestion-address {
+  font-size: 12px;
+  color: #666;
+}
+
+.search-loading {
+  padding: var(--spacing-medium);
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.category-filter {
+  display: flex;
+  gap: var(--spacing-small);
+  flex-wrap: wrap;
+}
+
+.category-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--spacing-small) var(--spacing-medium);
+  background: var(--background-light);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.category-label:hover {
+  background: #eaeaea;
+}
+
+.category-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar-container {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  height: 100%;
+  background: var(--background-light);
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.area-filter-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-small);
+  padding: var(--spacing-small) var(--spacing-medium);
+  background: #e8f4f8;
+  border-bottom: 2px solid var(--primary-color);
+  font-size: 13px;
+}
+
+.area-filter-indicator::before {
+  content: 'Viser steder i:';
+  color: #666;
+  font-size: 11px;
+  margin-right: 4px;
+}
+
+.area-filter-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.area-filter-clear {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.area-filter-clear:hover {
+  color: var(--primary-color);
+  background: rgba(0,0,0,0.05);
+}
+
+.sidebar {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--background-light);
+  padding: var(--spacing-medium);
+}
+
+.store-list {
+  list-style: none;
+}
+
+.store-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-small);
+  padding: var(--spacing-small);
+  margin-bottom: var(--spacing-small);
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+}
+
+.store-item:hover {
+  background: #eaeaea;
+}
+
+.store-item.selected {
+  background: #e0e7ef;
+}
+
+.store-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.store-info small {
+  color: #666;
+  font-size: 12px;
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+}
+
+.open-now-control {
+  position: absolute;
+  top: var(--spacing-medium);
+  left: var(--spacing-medium);
+  background: white;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.tips-button {
+  position: fixed;
+  top: var(--spacing-medium);
+  right: var(--spacing-medium);
+  padding: var(--spacing-medium) 24px;
+  font-size: 16px;
+  color: #fff;
+  background-color: var(--accent-color);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 100;
+}
+
+.tips-button:hover {
+  background-color: #4F827D;
+}
+
+/* Bottom sheet for mobil */
+.bottom-sheet {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 1000;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-out;
+}
+
+.bottom-sheet.show {
+  display: block;
+  transform: translateY(0);
+}
+
+.bottom-sheet-content {
+  padding: var(--spacing-medium);
+}
+
+.bottom-sheet-content h3 {
+  margin-bottom: var(--spacing-medium);
+  color: var(--primary-color);
+}
+
+.bottom-sheet-content p {
+  margin-bottom: var(--spacing-small);
+}
+
+.close-btn {
+  position: absolute;
+  top: var(--spacing-medium);
+  right: var(--spacing-medium);
+  font-size: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.place-image {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: var(--spacing-medium);
+}
+
+.opening-hours ul {
+  list-style: none;
+  margin-top: var(--spacing-small);
+}
+
+/* Tips modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.modal-tip {
+  position: relative;
+  background: #fff;
+  padding: var(--spacing-large);
+  border-radius: 10px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal-tip h2 {
+  margin-bottom: var(--spacing-medium);
+}
+
+.modal-tip form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-medium);
+}
+
+.modal-tip input,
+.modal-tip select {
+  padding: var(--spacing-small) var(--spacing-medium);
+  border: 1px solid var(--neutral-border);
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+.modal-tip button[type="submit"] {
+  padding: var(--spacing-medium);
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.modal-tip button[type="submit"]:disabled {
+  opacity: 0.5;
+}
+
+.close-tip {
+  position: absolute;
+  top: var(--spacing-small);
+  right: var(--spacing-medium);
+  font-size: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Autocomplete dropdown i tips-modal - samme stiler som i admin/editor */
+.modal-tip .tips-search-container {
+  position: relative;
+}
+
+.modal-tip .autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #ffffff !important;
+  border: 2px solid #2A2859 !important;
+  border-top: none !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.modal-tip .autocomplete-dropdown .autocomplete-item {
+  padding: 12px 16px !important;
+  cursor: pointer;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  border-bottom: 1px solid #e0e0e0 !important;
+  background-color: #ffffff !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+}
+
+.modal-tip .autocomplete-dropdown .autocomplete-item:last-child {
+  border-bottom: none !important;
+}
+
+.modal-tip .autocomplete-dropdown .autocomplete-item:hover {
+  background-color: #f9f9f9 !important;
+}
+
+.modal-tip .autocomplete-dropdown .autocomplete-main {
+  display: block !important;
+  font-weight: 500 !important;
+  color: #2A2859 !important;
+}
+
+.modal-tip .autocomplete-dropdown .autocomplete-secondary {
+  display: block !important;
+  font-size: 0.875rem !important;
+  color: #666666 !important;
+}
+
+.modal-tip .autocomplete-loading {
+  padding: 12px 16px;
+  color: #666666;
+  font-style: italic;
+}
+
+.modal-tip .tips-no-results {
+  font-size: 0.875rem;
+  color: #666666;
+  margin-top: var(--spacing-small);
+}
+
+.tips-selected-place {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--spacing-medium);
+  background-color: #f0f7ff;
+  border: 2px solid var(--primary-color);
+}
+
+.tips-selected-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tips-selected-info strong {
+  font-weight: 500;
+  color: #2A2859;
+}
+
+.tips-selected-info span {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.tips-change-place {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.875rem;
+  padding: 0;
+}
+
+.tips-change-place:hover {
+  color: var(--accent-color);
+}
+
+.success-message {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.error-message {
+  color: #d32f2f;
+}
+
+/* Loading state */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: var(--spacing-medium);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: #d32f2f;
+}
+
+/* InfoWindow styling */
+.info-window-content {
+  max-width: 350px;
+  font-family: 'OsloSans', Arial, sans-serif;
+}
+
+.info-window-content h3 {
+  color: var(--primary-color);
+  margin-bottom: var(--spacing-small);
+}
+
+.info-window-content img {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: var(--spacing-small);
+}
+
+.info-window-content p {
+  margin-bottom: var(--spacing-small);
+}
+
+.info-window-content a {
+  color: var(--primary-color);
+}
+
+/* Responsiv design */
+@media (max-width: 600px) {
+  .sidebar {
+    display: none;
+  }
+
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-container {
+    width: 100%;
+  }
+
+  .kart-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .tips-button {
+    top: auto;
+    bottom: var(--spacing-medium);
+    right: var(--spacing-medium);
+    padding: var(--spacing-small) var(--spacing-medium);
+    font-size: 14px;
+  }
+}

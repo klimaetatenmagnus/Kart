@@ -1,0 +1,62 @@
+name: Deploy Admin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/admin/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+env:
+  PROJECT_ID: bruktbutikk-navn
+  REGION: europe-west1
+  SERVICE_NAME: klimaoslo-kart-admin
+  REGISTRY: europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f apps/admin/Dockerfile \
+            --build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
+            --build-arg VITE_AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }} \
+            --build-arg VITE_AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
+            -t ${{ env.REGISTRY }}/admin:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/admin:latest \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.REGISTRY }}/admin:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/admin:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.REGISTRY }}/admin:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed

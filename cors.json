@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://kart.klimaoslo.no",
+      "https://admin.kart.klimaoslo.no",
+      "http://localhost:3000",
+      "http://localhost:3001"
+    ],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "name": "refresh-images",
+  "version": "1.0.0",
+  "description": "Cloud Function for refreshing expired image cache in KlimaOslo Kartplattform",
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.3.0",
+    "@google-cloud/storage": "^7.7.0"
+  }
+}

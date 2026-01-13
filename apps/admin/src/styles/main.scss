@@ -1,0 +1,14 @@
+/**
+ * KlimaOslo Kartadmin - Hovedstiler med Punkt designsystem
+ */
+
+/* Overstyr stien til fontene */
+@use "@oslokommune/punkt-css/dist/scss/abstracts/variables" with (
+  $font-path: "@oslokommune/punkt-assets/dist"
+);
+
+/* Hent inn Punkts stiler */
+@use "@oslokommune/punkt-css/dist/scss/pkt";
+
+/* Admin-spesifikke stiler */
+@use "./admin";

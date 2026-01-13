@@ -1,0 +1,133 @@
+steps:
+  # Bygg og push backend
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'apps/backend/Dockerfile'
+      - '-t'
+      - '${_REGISTRY}/api:$COMMIT_SHA'
+      - '-t'
+      - '${_REGISTRY}/api:latest'
+      - '.'
+    id: 'build-backend'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGISTRY}/api:$COMMIT_SHA']
+    id: 'push-backend'
+    waitFor: ['build-backend']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGISTRY}/api:latest']
+    id: 'push-backend-latest'
+    waitFor: ['build-backend']
+
+  # Bygg og push admin
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'apps/admin/Dockerfile'
+      - '--build-arg'
+      - 'VITE_API_URL=https://api.kart.klimaoslo.no'
+      - '--build-arg'
+      - 'VITE_AZURE_CLIENT_ID=${_AZURE_CLIENT_ID}'
+      - '--build-arg'
+      - 'VITE_AZURE_TENANT_ID=${_AZURE_TENANT_ID}'
+      - '-t'
+      - '${_REGISTRY}/admin:$COMMIT_SHA'
+      - '-t'
+      - '${_REGISTRY}/admin:latest'
+      - '.'
+    id: 'build-admin'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGISTRY}/admin:$COMMIT_SHA']
+    id: 'push-admin'
+    waitFor: ['build-admin']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGISTRY}/admin:latest']
+    id: 'push-admin-latest'
+    waitFor: ['build-admin']
+
+  # Bygg og push widget
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'apps/widget/Dockerfile'
+      - '--build-arg'
+      - 'VITE_API_URL=https://api.kart.klimaoslo.no'
+      - '--build-arg'
+      - 'VITE_GOOGLE_MAPS_API_KEY=${_MAPS_API_KEY}'
+      - '-t'
+      - '${_REGISTRY}/widget:$COMMIT_SHA'
+      - '-t'
+      - '${_REGISTRY}/widget:latest'
+      - '.'
+    id: 'build-widget'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGISTRY}/widget:$COMMIT_SHA']
+    id: 'push-widget'
+    waitFor: ['build-widget']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGISTRY}/widget:latest']
+    id: 'push-widget-latest'
+    waitFor: ['build-widget']
+
+  # Deploy til Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'klimaoslo-kart-api'
+      - '--image=${_REGISTRY}/api:$COMMIT_SHA'
+      - '--region=europe-west1'
+      - '--platform=managed'
+    id: 'deploy-backend'
+    waitFor: ['push-backend']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'klimaoslo-kart-admin'
+      - '--image=${_REGISTRY}/admin:$COMMIT_SHA'
+      - '--region=europe-west1'
+      - '--platform=managed'
+    id: 'deploy-admin'
+    waitFor: ['push-admin']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'klimaoslo-kart-widget'
+      - '--image=${_REGISTRY}/widget:$COMMIT_SHA'
+      - '--region=europe-west1'
+      - '--platform=managed'
+    id: 'deploy-widget'
+    waitFor: ['push-widget']
+
+substitutions:
+  _REGISTRY: europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart
+  _AZURE_CLIENT_ID: ''  # Settes i trigger
+  _AZURE_TENANT_ID: ''  # Settes i trigger
+  _MAPS_API_KEY: ''     # Settes i trigger
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - '${_REGISTRY}/api:$COMMIT_SHA'
+  - '${_REGISTRY}/api:latest'
+  - '${_REGISTRY}/admin:$COMMIT_SHA'
+  - '${_REGISTRY}/admin:latest'
+  - '${_REGISTRY}/widget:$COMMIT_SHA'
+  - '${_REGISTRY}/widget:latest'

@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>KlimaOslos gjenbrukskart</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      /* OsloSans fontdefinisjoner via AllOrigins med korrekt URL‑koding */
+      @font-face {
+        font-family: 'OsloSans';
+        src: url('https://api.allorigins.win/raw?url=https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Ddownload%26id%3D1xeRnT8Izq4WiuH_IMg51va6qL7vzQxrf') format('woff');
+        font-weight: 700;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: 'OsloSans';
+        src: url('https://api.allorigins.win/raw?url=https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Ddownload%26id%3D14Ec7ZSr-RQftJLPdMor5AaFphhk9Htrn') format('woff');
+        font-weight: 700;
+        font-style: italic;
+      }
+      @font-face {
+        font-family: 'OsloSans';
+        src: url('https://api.allorigins.win/raw?url=https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Ddownload%26id%3D1d2ZvstI9g9MoUqGqvHIP5z4_PhDKyFX_') format('woff');
+        font-weight: 300;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: 'OsloSans';
+        src: url('https://api.allorigins.win/raw?url=https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Ddownload%26id%3D1r-5T2HVE-JB0UWRikZHaf9NUjwUvMLfA') format('woff');
+        font-weight: 300;
+        font-style: italic;
+      }
+      @font-face {
+        font-family: 'OsloSans';
+        src: url('https://api.allorigins.win/raw?url=https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Ddownload%26id%3D1VSN4Tdla-e_3sxEIBq2NjKnqLosErT-v') format('woff');
+        font-weight: 500;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: 'OsloSans';
+        src: url('https://api.allorigins.win/raw?url=https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Ddownload%26id%3D1T_iTySTBLrreD56OYkCiDg4_AKOg6vKi') format('woff');
+        font-weight: 500;
+        font-style: italic;
+      }
+      @font-face {
+        font-family: 'OsloSans';
+        src: url('https://api.allorigins.win/raw?url=https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Ddownload%26id%3D1E5Nyk_BGLmQ9vAAigfeh9g6CrfJe8HXj') format('woff');
+        font-weight: 400;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: 'OsloSans';
+        src: url('https://api.allorigins.win/raw?url=https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Ddownload%26id%3D144dyOkgh90VPm0JTKk2JbV6uWXctHt4C') format('woff');
+        font-weight: 400;
+        font-style: italic;
+      }
+      
+      /* Offisielle farger og spacing */
+      :root {
+        --primary-color: #002855;
+        --hover-color:   #005A9C;
+        --active-color:  #001F3F;
+        --accent-color:  #034B45;
+        --neutral-border: #CCCCCC;
+        --background-light: #F9F9F9;
+        --text-color: #333333;
+        --spacing-small: 8px;
+        --spacing-medium: 16px;
+        --spacing-large: 24px;
+      }
+      
+      body {
+        font-family: 'OsloSans', Arial, sans-serif;
+        margin: 0;
+        color: var(--text-color);
+      }
+      
+      /* Logo */
+      #logo-container {
+        position: absolute;
+        top: var(--spacing-medium);
+        left: var(--spacing-medium);
+        z-index: 1100;
+      }
+      #logo-container img {
+        height: 6em;
+      }
+      
+      /* Kontainer for sidebar og kart */
+      #container {
+        display: flex;
+        min-height: 100vh;
+      }
+      
+      /* Sørg for at padding inngår i breddeberegning */
+      #sidebar, #search-container {
+        box-sizing: border-box;
+      }
+      
+      /* Sidebar: fast bredde (300px) med padding og fast høyde (80vh) – på små skjermer 70vh */
+      #sidebar {
+        width: 300px;
+        height: 80vh;
+        overflow-y: auto;
+        background: var(--background-light);
+        padding: var(--spacing-medium);
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+      }
+      @media (max-width: 600px) {
+        #map, #sidebar {
+          height: 70vh;
+        }
+      }
+      
+      #store-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      /* Standard hover-effekt for sidebar-elementene */
+      #store-list li:hover {
+        background: #eaeaea;
+      }
+      #store-list li {
+        padding: var(--spacing-small);
+        margin-bottom: var(--spacing-small);
+        border-bottom: 1px solid #ddd;
+        cursor: pointer;
+      }
+      
+      /* Kartet */
+      #map {
+        flex: 1;
+        width: 100%;
+        height: 80vh;
+        position: relative;
+        z-index: 1;
+      }
+      @media (max-width: 600px) {
+        #map {
+          height: 70vh;
+        }
+      }
+      
+      /* Kontroller – Søkefelt og hovedkategori-filter */
+      #controls {
+        display: flex;
+        align-items: center;
+        padding: var(--spacing-medium);
+        background: #fff;
+        box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+        gap: var(--spacing-medium);
+        margin-top: calc(var(--spacing-medium) * 3.5);
+      }
+      #search-container {
+        /* Bredde justeres via JavaScript */
+      }
+      #search-input {
+        width: 100%;
+        padding: var(--spacing-medium);
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-sizing: border-box;
+      }
+      
+      /* Hovedkategori-filter */
+      #main-category-filters {
+        display: flex;
+        gap: var(--spacing-medium);
+      }
+      .main-category {
+        position: relative;
+        transition: transform 0.3s ease;
+        flex-shrink: 0;
+      }
+      .main-category-button {
+        padding: var(--spacing-medium) 24px;
+        font-size: 18px;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: box-shadow 0.2s;
+        white-space: nowrap;
+        word-break: keep-all;
+        display: inline-block;
+        flex: none;
+        min-width: max-content;
+      }
+      .main-category-button:hover {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+      
+      /* Underkategori-container */
+      .sub-category-container {
+        position: absolute;
+        top: 0;
+        left: 100%;
+        display: flex;
+        gap: 10px;
+        padding-left: 10px;
+        transform: translateX(20px);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+      }
+      .main-category.expanded .sub-category-container {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+      
+      /* Underkategori-bokser */
+      .sub-category-label {
+        display: flex;
+        align-items: center;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 4px;
+        background: #f7f7f7;
+        transition: background 0.2s ease;
+      }
+      .sub-category-label:hover {
+        background: #eaeaea;
+      }
+      .sub-category-label input {
+        margin-right: 5px;
+        transform: scale(1.2);
+      }
+      .sub-category-label span {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 5px;
+      }
+      
+      /* Fargeprikker i sidebar */
+      .category-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 5px;
+      }
+      
+      /* "Åpen nå" – Samme design som kategori-boksene */
+      .open-now-label {
+        font-size: 18px;
+        padding: var(--spacing-medium);
+        margin: var(--spacing-small);
+        border-radius: 8px;
+        background: #f7f7f7;
+        cursor: pointer;
+        display: inline-block;
+      }
+      
+      /* Legende – redusert padding */
+      #legend {
+        background: #fff;
+        padding: 4px 8px;
+        border: 2px solid var(--primary-color);
+        border-radius: 5px;
+        box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        font-family: 'OsloSans', Arial, sans-serif;
+        font-size: 14px;
+      }
+      .legend-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 5px;
+      }
+      #legend p {
+        line-height: 1.2;
+        margin: 0;
+      }
+      
+      @media (max-width: 600px) {
+        #controls {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+      
+      .spinner {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        display: none;
+        z-index: 1100;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg) translate(-50%, -50%); }
+        100% { transform: rotate(360deg) translate(-50%, -50%); }
+      }
+      .bottom-sheet {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #fff;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        max-height: 80vh;
+        overflow-y: auto;
+        z-index: 1000;
+        transition: transform 0.3s ease-out;
+        transform: translateY(100%);
+      }
+      .bottom-sheet.show {
+        display: block;
+        transform: translateY(0%);
+      }
+      .info-window-content {
+        font-family: 'OsloSans', Arial, sans-serif;
+        max-width: 400px;
+        padding: var(--spacing-small) var(--spacing-medium) var(--spacing-medium) var(--spacing-medium);
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+        font-size: 14px;
+      }
+      .bottom-sheet-content {
+        padding: 0 var(--spacing-medium) var(--spacing-medium) var(--spacing-medium);
+        position: relative;
+      }
+      .close-btn {
+        font-size: 28px;
+        cursor: pointer;
+        position: absolute;
+        top: var(--spacing-medium);
+        right: var(--spacing-medium);
+        transition: color 0.2s, transform 0.2s;
+      }
+      .close-btn:hover {
+        color: var(--hover-color);
+        transform: scale(1.1);
+      }
+      .close-btn:focus {
+        outline: 2px solid var(--active-color);
+        box-shadow: 0 0 0 3px rgba(0,42,133,0.3);
+      }
+      
+      /* Butikkinnspill – knapp og modal */
+      .floating-tip-button {
+        padding: var(--spacing-medium) 24px;
+        font-size: 18px;
+        color: #fff;
+        background-color: var(--accent-color);
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: box-shadow 0.2s;
+        white-space: nowrap;
+        word-break: keep-all;
+      }
+      .modal-tip {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 1200;
+        width: 90%;
+        max-width: 400px;
+      }
+      .modal-tip h2 {
+        margin-top: 0;
+      }
+      .modal-tip input, .modal-tip select {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-sizing: border-box;
+      }
+      .modal-tip button {
+        background-color: var(--accent-color);
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .modal-tip .close-tip {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 20px;
+        cursor: pointer;
+      }
+      .modal-tip #result {
+        margin-top: 10px;
+        font-weight: bold;
+      }
+    </style>
+    <!-- Last inn Google Maps API og PapaParse -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDd7CyClS1TpajkVAuDgNB32z6NPGM4fSs&libraries=places"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  </head>
+  <body>
+    <!-- Logo -->
+    <div id="logo-container">
+      <img src="https://www.klimaoslo.no/wp-content/uploads/sites/2/2025/02/Oslo-logo-sort-RGB.png" alt="Oslo-logo">
+    </div>
+    <h1 style="text-align:center; margin-top: calc(var(--spacing-large) * 1.5); margin-bottom: var(--spacing-medium);">
+      KlimaOslos gjenbrukskart
+    </h1>
+    <div id="controls">
+      <div id="search-container">
+        <input type="text" id="search-input" placeholder="Søk butikk..." aria-label="Søk etter butikk">
+      </div>
+      <div id="main-category-filters"></div>
+    </div>
+    
+    <div id="container">
+      <div id="sidebar">
+        <ul id="store-list"></ul>
+      </div>
+      <div id="map"></div>
+    </div>
+    
+    <div id="spinner" class="spinner"></div>
+    
+    <!-- Bottom sheet for mobil -->
+    <div id="bottom-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Detaljer for valgt butikk">
+      <div id="sheet-content" class="bottom-sheet-content"></div>
+      <button id="close-sheet" class="close-btn" tabindex="0" aria-label="Lukk dialog">&times;</button>
+    </div>
+    
+    <!-- "Tips oss"-knappen -->
+    <button id="tips-knapp" class="floating-tip-button">Tips oss om en butikk</button>
+    
+    <!-- Modal for butikkinnspill -->
+    <div id="tips-modal" class="modal-tip">
+      <span class="close-tip" id="close-tip">&times;</span>
+      <h2>Tips oss om en butikk</h2>
+      <form id="tipsForm">
+        <input type="text" id="butikknavn" name="butikknavn" placeholder="Butikknavn" required>
+        <input type="text" id="adresse" name="adresse" placeholder="Adresse" required>
+        <!-- Drop-down for kategori fylles automatisk -->
+        <select id="kategori" name="kategori"></select>
+        <button type="submit" id="send-tip">Send inn</button>
+      </form>
+      <div id="result"></div>
+    </div>
+    
+    <script>
+      let map;
+      let placesService;
+      let markers = [];
+      let openNowFilter = false; // Global variabel for "Åpen nå"-filteret
+      let selectedSubcategories = new Set();
+      let updateIntervalID = null;  // Global variabel for å holde intervallet
+
+      // Underkategorier definert i kartet
+      const subCategoryColors = {
+        "Skomaker": "#2A2859",
+        "Klesreparasjon": "#F9C66B",
+        "Mobil og elektronikk": "#D0BFAE",
+        "Klær": "#6FE9FF",
+        "Tekstiler": "#034B45",
+        "Interiør": "#FF8274"
+      };
+
+      // Hover-farger for muse-over effekt
+      const subCategoryHoverColors = {
+        "Skomaker": "#6A698B",
+        "Klesreparasjon": "#FAD797",
+        "Mobil og elektronikk": "#ECBF92",
+        "Klær": "#9AF0FF",
+        "Tekstiler": "#4F827D",
+        "Interiør": "#FFA69E"
+      };
+
+      // Hovedkategori-definisjoner med underkategorier
+      const mainCategories = {
+        "Reparasjon": {
+          buttonColor: "#2A2859",
+          subcategories: ["Skomaker", "Klesreparasjon", "Mobil og elektronikk"]
+        },
+        "Bruktbutikker": {
+          buttonColor: "#002855",
+          subcategories: ["Klær", "Tekstiler", "Interiør"]
+        }
+      };
+      
+      let infoWindow = new google.maps.InfoWindow({ pixelOffset: new google.maps.Size(0, -120) });
+      
+      function updateMainCategoryOffsets() {
+        const reparasjonButton = document.querySelector('.main-category-button[data-main-category="Reparasjon"]');
+        const bruktButikkerButton = document.querySelector('.main-category-button[data-main-category="Bruktbutikker"]');
+        if (reparasjonButton && bruktButikkerButton) {
+          if (!reparasjonButton.parentElement.classList.contains("expanded")) {
+            bruktButikkerButton.parentElement.style.transform = "";
+          } else {
+            const subContainer = reparasjonButton.parentElement.querySelector('.sub-category-container');
+            let offset = subContainer ? subContainer.offsetWidth + 10 : 200;
+            bruktButikkerButton.parentElement.style.transform = "translateX(" + offset + "px)";
+          }
+        }
+      }
+      
+      function createMainCategoryFilters() {
+        const container = document.getElementById("main-category-filters");
+        container.innerHTML = "";
+        for (let mainCat in mainCategories) {
+          const mainDiv = document.createElement("div");
+          mainDiv.className = "main-category";
+          const mainButton = document.createElement("button");
+          mainButton.className = "main-category-button";
+          mainButton.style.backgroundColor = mainCategories[mainCat].buttonColor;
+          mainButton.textContent = mainCat;
+          mainButton.dataset.mainCategory = mainCat;
+          mainButton.addEventListener("click", function() {
+            mainDiv.classList.toggle("expanded");
+            updateMainCategoryOffsets();
+            updateMarkers();
+          });
+          mainDiv.appendChild(mainButton);
+          
+          const subContainer = document.createElement("div");
+          subContainer.className = "sub-category-container";
+          mainCategories[mainCat].subcategories.forEach(subCat => {
+            const label = document.createElement("label");
+            label.className = "sub-category-label";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.className = "sub-category-checkbox";
+            checkbox.value = subCat;
+            checkbox.checked = true;
+            checkbox.addEventListener("change", updateMarkers);
+            label.appendChild(checkbox);
+            const colorDot = document.createElement("span");
+            colorDot.style.backgroundColor = subCategoryColors[subCat] || "#000000";
+            label.appendChild(colorDot);
+            label.appendChild(document.createTextNode(subCat === "Mobil og elektronikk" ? "Mobil\u00A0og\u00A0elektronikk" : subCat));
+            subContainer.appendChild(label);
+          });
+          mainDiv.appendChild(subContainer);
+          container.appendChild(mainDiv);
+        }
+      }
+      
+      function updateSelectedSubcategories() {
+        selectedSubcategories.clear();
+        document.querySelectorAll(".sub-category-checkbox:checked").forEach(checkbox => {
+          selectedSubcategories.add(checkbox.value);
+        });
+      }
+      
+      function updateMarkers() {
+        updateSelectedSubcategories();
+        const query = document.getElementById("search-input").value.toLowerCase();
+        markers.forEach(marker => {
+          const valid = marker.category.some(cat => selectedSubcategories.has(cat));
+          const validSearch = marker.title.toLowerCase().includes(query);
+          // Tar hensyn til openNowFilter
+          if (valid && validSearch && (!openNowFilter || marker.isOpen)) {
+            let selectedCat = marker.category.find(cat => selectedSubcategories.has(cat)) || marker.category[0];
+            let markerScale = window.innerWidth < 600 ? 12 : 10;
+            marker.setIcon({
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: subCategoryColors[selectedCat] || "#000000",
+              fillOpacity: 1,
+              scale: markerScale,
+              strokeColor: "#FFFFFF",
+              strokeWeight: 2
+            });
+            marker.setMap(map);
+          } else {
+            marker.setMap(null);
+          }
+        });
+        updateSidebar();
+      }
+      
+      function updateSidebar() {
+        const storeList = document.getElementById("store-list");
+        storeList.innerHTML = "";
+        const visibleMarkers = markers.filter(marker => marker.getMap());
+        visibleMarkers.sort((a, b) => {
+          let catA = a.category.find(cat => subCategoryColors[cat]) || "";
+          let catB = b.category.find(cat => subCategoryColors[cat]) || "";
+          if (catA < catB) return -1;
+          if (catA > catB) return 1;
+          return a.title.localeCompare(b.title);
+        });
+        visibleMarkers.forEach(marker => {
+          let sortedCats = marker.category.filter(c => subCategoryColors[c]).sort();
+          let dotsHTML = sortedCats.map(c =>
+            `<span class="category-dot" style="background-color:${subCategoryColors[c]};"></span>`
+          ).join('');
+          const li = document.createElement("li");
+          li.innerHTML = `${dotsHTML}<strong>${marker.title}</strong>${marker.description ? `<br><small>${marker.description.substring(0, 60)}...</small>` : ""}`;
+          li.addEventListener("click", function() {
+            selectMarker(marker, marker.content);
+          });
+          storeList.appendChild(li);
+        });
+      }
+      
+      function adjustMapForInfoWindow() {
+        const mapDiv = map.getDiv();
+        const mapRect = mapDiv.getBoundingClientRect();
+        const iwOuter = document.querySelector('.gm-style-iw');
+        if (!iwOuter) return;
+        const iwRect = iwOuter.getBoundingClientRect();
+        const margin = 10;
+        let offsetY = 0;
+        if (iwRect.top < mapRect.top) {
+          offsetY = mapRect.top - iwRect.top + margin;
+        } else if (iwRect.bottom > mapRect.bottom) {
+          offsetY = mapRect.bottom - iwRect.bottom - margin;
+        }
+        if (offsetY !== 0) {
+          map.panBy(0, offsetY);
+        }
+      }
+      
+      function selectMarker(marker, content) {
+        marker.setAnimation(google.maps.Animation.BOUNCE);
+        setTimeout(() => { marker.setAnimation(null); }, 700);
+        map.panTo(marker.getPosition());
+        if (window.innerWidth < 600) {
+          openBottomSheet(content);
+        } else {
+          smoothZoom(map, 16, map.getZoom(), function() {
+            infoWindow.setContent(content);
+            infoWindow.open(map, marker);
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+              adjustMapForInfoWindow();
+            });
+          });
+        }
+      }
+      
+      function smoothZoom(map, targetZoom, currentZoom, callback) {
+        if (currentZoom >= targetZoom) {
+          if (callback) callback();
+          return;
+        }
+        map.setZoom(currentZoom + 1);
+        setTimeout(() => {
+          smoothZoom(map, targetZoom, currentZoom + 1, callback);
+        }, 80);
+      }
+      
+      function processData(data) {
+        markers.forEach(marker => marker.setMap(null));
+        markers = [];
+        data.forEach(row => {
+          if (!row["Place ID"] || row["Place ID"].trim() === "") return;
+          let placeId = row["Place ID"].replace(/\r/g, "").trim();
+          let description = "";
+          let categories = row["Kategori"].split(",").map(cat => cat.trim());
+          placesService.getDetails(
+            { placeId: placeId, fields: ['name', 'geometry', 'formatted_address', 'opening_hours', 'formatted_phone_number', 'photos', 'website', 'url'] },
+            function(place, status) {
+              if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                const marker = new google.maps.Marker({
+                  position: place.geometry.location,
+                  map: map,
+                  title: place.name,
+                  category: categories
+                });
+                // Lagre placeId for periodisk oppdatering
+                marker.placeId = placeId;
+                marker.description = description;
+                marker.isOpen = (place.opening_hours && typeof place.opening_hours.open_now !== "undefined")
+                                  ? place.opening_hours.open_now
+                                  : false;
+                let photoUrl = place.photos ? place.photos[0].getUrl({ maxWidth: 400 }) : null;
+                let websiteUrl = place.website ? `<div><a href="${place.website}" target="_blank">🌍 Besøk nettside</a></div>` : "";
+                let directionsUrl = `<div><a href="https://www.google.com/maps/dir/?api=1&destination=${place.geometry.location.lat()},${place.geometry.location.lng()}" target="_blank">🗺️ Få veibeskrivelse</a></div>`;
+                const content = `
+                  <div class="info-window-content">
+                    <div style="font-size: 26px; font-weight: bold; color: var(--primary-color); margin: 0 0 var(--spacing-small) 0;">${place.name}</div>
+                    ${photoUrl ? `<div><img src="${photoUrl}" loading="lazy" style="width:100%;max-width:400px;height:auto;border-radius:8px; margin-bottom: var(--spacing-small);"></div>` : ""}
+                    <div><strong>📍 Adresse:</strong><br>${place.formatted_address || "Ikke tilgjengelig"}</div><hr>
+                    ${place.opening_hours && place.opening_hours.weekday_text ? `<div><strong>⏰ Åpningstider:</strong><br>${place.opening_hours.weekday_text.join("<br>")}</div><hr>` : ""}
+                    ${place.formatted_phone_number ? `<div><strong>📞 Telefon:</strong> ${place.formatted_phone_number}</div><hr>` : ""}
+                    ${marker.description ? `<div><strong>Beskrivelse:</strong><br>${marker.description}</div><hr>` : ""}
+                    ${websiteUrl}
+                    ${directionsUrl}
+                  </div>
+                `;
+                marker.content = content;
+                marker.addListener("click", () => {
+                  selectMarker(marker, content);
+                });
+                marker.addListener("mouseover", function() {
+                  let selectedCat = marker.category.find(cat => selectedSubcategories.has(cat)) || marker.category[0];
+                  let markerScale = window.innerWidth < 600 ? 12 : 10;
+                  marker.setIcon({
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: subCategoryHoverColors[selectedCat] || subCategoryColors[selectedCat] || "#000000",
+                    fillOpacity: 1,
+                    scale: markerScale,
+                    strokeColor: "#FFFFFF",
+                    strokeWeight: 2
+                  });
+                });
+                marker.addListener("mouseout", function() {
+                  let selectedCat = marker.category.find(cat => selectedSubcategories.has(cat)) || marker.category[0];
+                  let markerScale = window.innerWidth < 600 ? 12 : 10;
+                  marker.setIcon({
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: subCategoryColors[selectedCat] || "#000000",
+                    fillOpacity: 1,
+                    scale: markerScale,
+                    strokeColor: "#FFFFFF",
+                    strokeWeight: 2
+                  });
+                });
+                markers.push(marker);
+                updateMarkers();
+              }
+            }
+          );
+        });
+      }
+      
+      // Funksjon for dynamisk periodisk API-henting av åpningstider
+      function updateOpenStatus() {
+        markers.forEach(marker => {
+          if (!marker.placeId) return;
+          placesService.getDetails({
+            placeId: marker.placeId,
+            fields: ['opening_hours']
+          }, function(place, status) {
+            if (status === google.maps.places.PlacesServiceStatus.OK && place && place.opening_hours) {
+              marker.isOpen = place.opening_hours.open_now;
+            } else {
+              marker.isOpen = false;
+            }
+            // Oppdater kun markøren basert på den nye isOpen-statusen
+            if (openNowFilter && !marker.isOpen) {
+              marker.setMap(null);
+            } else {
+              marker.setMap(map);
+            }
+          });
+        });
+      }
+      
+      function startPeriodicUpdate() {
+        // Initial oppdatering
+        updateOpenStatus();
+        // Sett intervallet til 10 minutter (600000 ms)
+        updateIntervalID = setInterval(function() {
+          if (openNowFilter) {
+            updateOpenStatus();
+          } else {
+            clearInterval(updateIntervalID);
+          }
+        }, 600000);
+      }
+      
+      // Opprett "Åpen nå"-kontroll med integrasjon av periodisk oppdatering
+      function createOpenNowControl() {
+        var openNowDiv = document.createElement('div');
+        openNowDiv.innerHTML = '<label class="sub-category-label"><input type="checkbox" id="open-now"> Åpen nå</label>';
+        openNowDiv.style.marginLeft = "16px";
+        openNowDiv.style.marginTop = "10px";
+        map.controls[google.maps.ControlPosition.TOP_LEFT].push(openNowDiv);
+
+        openNowDiv.querySelector('#open-now').addEventListener("change", function(){
+          openNowFilter = this.checked;
+          updateMarkers();
+          if (openNowFilter) {
+            startPeriodicUpdate();
+          } else if (updateIntervalID !== null) {
+            clearInterval(updateIntervalID);
+          }
+        });
+      }
+      
+      function openBottomSheet(content) {
+        document.getElementById("sheet-content").innerHTML = content;
+        const sheet = document.getElementById("bottom-sheet");
+        sheet.classList.add("show");
+      }
+      
+      function adjustSearchWidth() {
+        const mapElement = document.getElementById("map");
+        const searchContainer = document.getElementById("search-container");
+        const mapLeft = mapElement.getBoundingClientRect().left;
+        const sidebarStyle = window.getComputedStyle(document.getElementById("sidebar"));
+        const paddingLeft = parseFloat(sidebarStyle.paddingLeft);
+        const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--spacing-medium'));
+        searchContainer.style.width = (mapLeft - paddingLeft - gap) + "px";
+      }
+      
+      function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+          center: { lat: 59.9139, lng: 10.7522 },
+          zoom: 12,
+          zoomControl: true,
+          zoomControlOptions: {
+            position: google.maps.ControlPosition.RIGHT_BOTTOM
+          },
+          mapTypeControl: false,
+          fullscreenControl: true
+        });
+        
+        placesService = new google.maps.places.PlacesService(map);
+        adjustSearchWidth();
+        window.addEventListener('resize', adjustSearchWidth);
+        loadCSV();
+
+        // Legg til "Åpen nå"-kontroll
+        createOpenNowControl();
+        
+        // Opprett wrapper for "Tips oss"-knappen
+        const tipsKnappWrapper = document.createElement("div");
+        tipsKnappWrapper.style.marginTop = "20px";
+        tipsKnappWrapper.appendChild(document.getElementById("tips-knapp"));
+        map.controls[google.maps.ControlPosition.TOP_RIGHT].push(tipsKnappWrapper);
+      }
+      
+      function loadCSV() {
+        document.getElementById("spinner").style.display = "block";
+        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vStKzw6gJ2I6FaOJURlr0RoaxB8_lfXk8n-Qs5gWnjqutb3PnZ5oR8jSiKMZpoeFEslAtYmciz9DYy4/pub?output=csv";
+        Papa.parse("https://api.allorigins.win/raw?url=" + encodeURIComponent(csvUrl), {
+          download: true,
+          header: true,
+          skipEmptyLines: true,
+          complete: function(results) {
+            document.getElementById("spinner").style.display = "none";
+            createMainCategoryFilters();
+            processData(results.data);
+          },
+          error: function(err) {
+            alert("Noe gikk galt under lasting av data. Vennligst prøv igjen senere.");
+          }
+        });
+      }
+      
+      function populateKategoriDropdown() {
+        const kategoriSelect = document.getElementById("kategori");
+        kategoriSelect.innerHTML = "";
+        let optionsSet = new Set();
+        for (let mainCat in mainCategories) {
+          mainCategories[mainCat].subcategories.forEach(subCat => optionsSet.add(subCat));
+        }
+        let optionsArray = Array.from(optionsSet).sort();
+        optionsArray.forEach(opt => {
+          let optionElem = document.createElement("option");
+          optionElem.value = opt;
+          optionElem.textContent = opt;
+          kategoriSelect.appendChild(optionElem);
+        });
+      }
+      
+      function createLegend() {
+        let legend = document.getElementById("legend");
+        if (!legend) {
+          legend = document.createElement("div");
+          legend.id = "legend";
+          map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(legend);
+        }
+        legend.innerHTML = "<h3>Legende</h3>";
+        for (let subCat in subCategoryColors) {
+          legend.innerHTML += '<p><span class="legend-dot" style="background-color:' + subCategoryColors[subCat] + ';"></span> ' + subCat + '</p>';
+        }
+      }
+      
+      window.onload = function() {
+        initMap();
+        createLegend();
+        populateKategoriDropdown();
+      };
+      
+      document.getElementById("search-input").addEventListener("input", updateMarkers);
+
+      // --- Håndtering av butikkinnspill ---
+      const tipsKnapp = document.getElementById('tips-knapp');
+      const tipsModal = document.getElementById('tips-modal');
+      const closeTip = document.getElementById('close-tip');
+      const sendTipButton = document.getElementById('send-tip');
+
+      tipsKnapp.addEventListener('click', function() {
+        tipsModal.style.display = 'block';
+      });
+
+      closeTip.addEventListener('click', function() {
+        tipsModal.style.display = 'none';
+      });
+
+      window.addEventListener('click', function(e) {
+        if (e.target == tipsModal) {
+          tipsModal.style.display = 'none';
+        }
+      });
+
+      document.getElementById('tipsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        sendTipButton.disabled = true;
+        sendTipButton.style.opacity = 0.5;
+        
+        var butikknavn = document.getElementById('butikknavn').value;
+        var adresse = document.getElementById('adresse').value;
+        var kategori = document.getElementById('kategori').value;
+
+        var data = new URLSearchParams();
+        data.append("butikknavn", butikknavn);
+        data.append("adresse", adresse);
+        data.append("kategori", kategori);
+
+        fetch("https://script.google.com/macros/s/AKfycbwjc9teGma4wg1UmjvMkVWQwQYE-jNgiAeAJqIMYatQHjaIVr4H-SMOEq3rQT6xAXrIUg/exec", {
+          method: "POST",
+          body: data
+        })
+        .then(response => response.json())
+        .then(json => {
+          if (json.status === "success") {
+            document.getElementById('result').innerText = "Takk for tipset!";
+            document.getElementById('tipsForm').reset();
+          } else {
+            document.getElementById('result').innerText = "Noe gikk galt: " + json.message;
+          }
+          sendTipButton.disabled = false;
+          sendTipButton.style.opacity = 1;
+        })
+        .catch(error => {
+          document.getElementById('result').innerText = "Feil: " + error.toString();
+          sendTipButton.disabled = false;
+          sendTipButton.style.opacity = 1;
+        });
+      });
+    </script>
+  </body>
+</html>
