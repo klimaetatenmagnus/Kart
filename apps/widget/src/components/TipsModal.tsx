@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { PktTextinput, PktCombobox, PktButton, PktAlert } from '@oslokommune/punkt-react'
+import { PktTextinput, PktCombobox, PktButton, PktAlert, PktIcon } from '@oslokommune/punkt-react'
 import type { Kategori } from '@klimaoslo-kart/shared'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -180,16 +180,32 @@ export function TipsModal({ kartinstansId, kategorier, onClose }: TipsModalProps
                 </div>
               ) : (
                 <>
-                  <PktTextinput
-                    id="sted-sok"
-                    name="sted-sok"
-                    label="Søk etter sted"
-                    placeholder="Skriv inn navn på stedet..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                    fullwidth
-                  />
+                  <div className="tips-search-input-wrapper">
+                    <PktTextinput
+                      id="sted-sok"
+                      name="sted-sok"
+                      label="Søk etter sted"
+                      placeholder="Skriv inn navn på stedet..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                      fullwidth
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        className="tips-search-clear-button"
+                        onClick={() => {
+                          setSearchQuery('')
+                          setSuggestions([])
+                          setShowSuggestions(false)
+                        }}
+                        aria-label="Tøm søkefelt"
+                      >
+                        <PktIcon name="close" className="tips-search-clear-icon" />
+                      </button>
+                    )}
+                  </div>
                   {showSuggestions && suggestions.length > 0 && (
                     <div className="autocomplete-dropdown">
                       {loadingSuggestions && (

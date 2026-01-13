@@ -137,7 +137,7 @@ export function TipsOversikt() {
       )}
 
       {error && (
-        <PktAlert skin="error" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <PktAlert skin="error" style={{ marginBottom: 'var(--pkt-spacing-16)' }}>
           {error}
         </PktAlert>
       )}

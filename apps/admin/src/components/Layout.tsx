@@ -14,8 +14,10 @@ export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  // Sjekk om vi er på en kartinstans-editor side
+  // Sjekk om vi er på en side med tilbakeknapp
   const isOnEditorPage = location.pathname.startsWith('/kart/')
+  const isOnTipsPage = location.pathname === '/tips'
+  const showBackButton = isOnEditorPage || isOnTipsPage
 
   useEffect(() => {
     const fetchNyeTips = async () => {
@@ -83,7 +85,7 @@ export function Layout() {
         <Link to="/tips" className="nav-link">
           Tips fra brukere{nyeTipsCount > 0 && ` (${nyeTipsCount})`}
         </Link>
-        {isOnEditorPage && (
+        {showBackButton && (
           <div className="nav-right">
             <PktButton
               skin="secondary"

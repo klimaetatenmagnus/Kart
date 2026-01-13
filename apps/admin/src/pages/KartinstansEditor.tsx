@@ -782,7 +782,7 @@ export function KartinstansEditor() {
       </div>
 
       {error && (
-        <PktAlert skin="error" style={{ marginBottom: 'var(--spacing-md)' }}>
+        <PktAlert skin="error" style={{ marginBottom: 'var(--pkt-spacing-16)' }}>
           {error}
         </PktAlert>
       )}
@@ -814,6 +814,21 @@ export function KartinstansEditor() {
                         onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                       />
                     </div>
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        className="search-clear-button"
+                        onClick={() => {
+                          setSearchQuery('')
+                          setSuggestions([])
+                          setShowSuggestions(false)
+                          setSearchResults([])
+                        }}
+                        aria-label="Tøm søkefelt"
+                      >
+                        <PktIcon name="close" className="search-clear-icon" />
+                      </button>
+                    )}
                   </div>
                   {showSuggestions && suggestions.length > 0 && (
                     <div className="autocomplete-dropdown">

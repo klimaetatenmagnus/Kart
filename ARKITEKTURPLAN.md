@@ -95,6 +95,9 @@ Målet er å bygge en selvhostet kartplattform på Google Cloud som:
 | 2026-01-13 | `/api/public/places/details` utvidet med telefon, nettside, åpningstider, bilder. | Fullført |
 | 2026-01-13 | MapView endret fra frontend Places SDK til backend API-kall for sikkerhet. | Fullført |
 | 2026-01-13 | Backend genererer bilde-URL-er fra Google Places Photo API. | Fullført |
+| 2026-01-13 | **Typografi-revisjon:** Alle hardkodede font-size verdier erstattet med Punkt `get-text()` SCSS-mixin. | Fullført |
+| 2026-01-13 | Widget og admin SCSS oppdatert til å importere `@oslokommune/punkt-css/dist/scss/abstracts/mixins/typography`. | Fullført |
+| 2026-01-13 | Typografi i InfoWindowContent, søkefelt, sidebar, tips-modal, admin-tabeller etc. følger nå Punkt-retningslinjer. | Fullført |
 
 ---
 
@@ -1506,6 +1509,20 @@ Opprett `apps/widget/src/styles/main.scss`:
 @use "./app";
 ```
 
+I `apps/widget/src/styles/_app.scss`, importer nødvendige mixins:
+
+```scss
+@use "sass:map";
+@use "@oslokommune/punkt-css/dist/scss/abstracts/variables" as pkt;
+@use "@oslokommune/punkt-css/dist/scss/abstracts/mixins/breakpoints" as *;
+@use "@oslokommune/punkt-css/dist/scss/abstracts/mixins/typography" as *;
+
+// Bruk typography mixin for konsistent typografi
+.info-window__header h3 {
+  @include get-text("pkt-txt-18-medium");
+}
+```
+
 ### Widget-komponenter: Migreringsplan
 
 #### 1. SearchBar.tsx
@@ -1970,15 +1987,62 @@ Bruk Punkt grid-system for responsiv layout:
 
 ### Typografi
 
-Bruk Punkt typografi-klasser:
+#### Tilgjengelige Punkt typografi-klasser
 
-| Element | Punkt-klasse |
-|---------|--------------|
-| Overskrift H1 | `pkt-txt-36-bold` |
-| Overskrift H2 | `pkt-txt-24-medium` |
-| Overskrift H3 | `pkt-txt-18-medium` |
-| Brødtekst | `pkt-txt-16` |
-| Liten tekst | `pkt-txt-14` |
+| Størrelse | Regular | Medium | Bold | Light |
+|-----------|---------|--------|------|-------|
+| 12px | `pkt-txt-12` | `pkt-txt-12-medium` | `pkt-txt-12-bold` | `pkt-txt-12-light` |
+| 14px | `pkt-txt-14` | `pkt-txt-14-medium` | `pkt-txt-14-bold` | `pkt-txt-14-light` |
+| 16px | `pkt-txt-16` | `pkt-txt-16-medium` | `pkt-txt-16-bold` | `pkt-txt-16-light` |
+| 18px | `pkt-txt-18` | `pkt-txt-18-medium` | `pkt-txt-18-bold` | `pkt-txt-18-light` |
+| 24px | `pkt-txt-24` | `pkt-txt-24-medium` | `pkt-txt-24-bold` | `pkt-txt-24-light` |
+| 30px | `pkt-txt-30` | `pkt-txt-30-medium` | `pkt-txt-30-bold` | `pkt-txt-30-light` |
+
+#### Bruk i SCSS med `get-text()` mixin (anbefalt)
+
+For å bruke typografi i SCSS, importer typography-mixin og bruk `get-text()`:
+
+```scss
+@use "@oslokommune/punkt-css/dist/scss/abstracts/mixins/typography" as *;
+
+.my-heading {
+  @include get-text("pkt-txt-18-medium");
+  color: var(--color-primary);
+}
+
+.my-body-text {
+  @include get-text("pkt-txt-14");
+}
+
+.my-small-label {
+  @include get-text("pkt-txt-12-medium");
+}
+```
+
+Mixin-tilnærmingen er foretrukket fordi den:
+- Setter korrekt `font-size`, `font-weight`, `line-height` og `letter-spacing`
+- Holder styling i SCSS (separation of concerns)
+- Er lettere å vedlikeholde
+
+#### Bruk i JSX med CSS-klasser
+
+For enklere tilfeller kan typografi-klasser brukes direkte:
+
+```tsx
+<h2 className="pkt-txt-24-medium">Overskrift</h2>
+<p className="pkt-txt-14">Brødtekst</p>
+```
+
+#### Typografi-mapping
+
+| Element | Anbefalt klasse |
+|---------|-----------------|
+| Hovedoverskrift (H1) | `pkt-txt-30-medium` |
+| Seksjonsoverskrift (H2) | `pkt-txt-24-medium` |
+| Underoverskrift (H3) | `pkt-txt-18-medium` |
+| Brødtekst | `pkt-txt-16` eller `pkt-txt-14` |
+| Labels/metadata | `pkt-txt-14-medium` |
+| Liten tekst/badges | `pkt-txt-12` eller `pkt-txt-12-medium` |
 
 ### Implementeringsrekkefølge (Widget)
 
@@ -2009,6 +2073,14 @@ Bruk Punkt typografi-klasser:
    - [x] SCSS bruker Punkt-variabler for farger, spacing og border-radius
    - [x] Alle border-radius satt til 0 (skarpe hjørner)
    - [ ] Oppdater layout til Punkt grid (valgfritt)
+
+7. **Steg 7: Typografi-revisjon** - FULLFØRT
+   - [x] Importert typography mixin i `_app.scss`
+   - [x] Erstattet alle hardkodede `font-size` med `@include get-text()`
+   - [x] InfoWindowContent typografi (`pkt-txt-18-medium`, `pkt-txt-14`, `pkt-txt-14-medium`)
+   - [x] Søkefelt og autocomplete typografi
+   - [x] Sidebar og tips-modal typografi
+   - [x] Area-filter typografi (`pkt-txt-14`, `pkt-txt-12`)
 
 ### Komponenter som beholder custom styling
 
@@ -2124,6 +2196,25 @@ apps/admin/src/
 
 /* Admin-spesifikke stiler */
 @use "./admin";
+```
+
+I `apps/admin/src/styles/_admin.scss`, importer nødvendige mixins:
+
+```scss
+@use "sass:map";
+@use "@oslokommune/punkt-css/dist/scss/abstracts/variables" as pkt;
+@use "@oslokommune/punkt-css/dist/scss/abstracts/mixins/breakpoints" as *;
+@use "@oslokommune/punkt-css/dist/scss/abstracts/mixins/typography" as *;
+
+// Bruk typography mixin for konsistent typografi
+.card-meta {
+  @include get-text("pkt-txt-14");
+  color: var(--color-text-muted);
+}
+
+.kategori-badge {
+  @include get-text("pkt-txt-12-medium");
+}
 ```
 
 ### Implementeringsrekkefølge (Admin)
@@ -2327,6 +2418,16 @@ import {
   />
 </div>
 ```
+
+#### Fase 8: Typografi-revisjon - FULLFØRT
+- [x] Importert typography mixin i `_admin.scss`
+- [x] Erstattet alle hardkodede `font-size` med `@include get-text()`
+- [x] Dashboard og kort-typografi (`pkt-txt-14`, `pkt-txt-14-medium`)
+- [x] Tabell-typografi (`pkt-txt-14-medium` for headers)
+- [x] Badges og labels (`pkt-txt-12-medium`)
+- [x] Autocomplete og søkeresultater-typografi
+- [x] Embed-kode og input-typografi
+- [x] Floating action panel og bekreftelsesdialog-typografi
 
 ### CSS-variabel Mapping (Admin)
 

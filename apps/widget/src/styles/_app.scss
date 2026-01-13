@@ -5,6 +5,8 @@
 
 @use "sass:map";
 @use "@oslokommune/punkt-css/dist/scss/abstracts/variables" as pkt;
+@use "@oslokommune/punkt-css/dist/scss/abstracts/mixins/breakpoints" as *;
+@use "@oslokommune/punkt-css/dist/scss/abstracts/mixins/typography" as *;
 
 // CSS custom properties for enklere bruk
 :root {
@@ -17,10 +19,15 @@
   --background-light: #{map.get(pkt.$pkt-colors, "brand-neutrals-100")};
   --text-color: #{map.get(pkt.$pkt-colors, "grays-gray-800")};
 
-  // Spacing
-  --spacing-small: #{map.get(pkt.$spacing, "size-8")};
-  --spacing-medium: #{map.get(pkt.$spacing, "size-16")};
-  --spacing-large: #{map.get(pkt.$spacing, "size-24")};
+  // Spacing - matcher Punkt spacing scale
+  --pkt-spacing-2: #{map.get(pkt.$spacing, "size-2")};
+  --pkt-spacing-4: #{map.get(pkt.$spacing, "size-4")};
+  --pkt-spacing-8: #{map.get(pkt.$spacing, "size-8")};
+  --pkt-spacing-12: #{map.get(pkt.$spacing, "size-12")};
+  --pkt-spacing-16: #{map.get(pkt.$spacing, "size-16")};
+  --pkt-spacing-24: #{map.get(pkt.$spacing, "size-24")};
+  --pkt-spacing-32: #{map.get(pkt.$spacing, "size-32")};
+  --pkt-spacing-40: #{map.get(pkt.$spacing, "size-40")};
 }
 
 * {
@@ -47,8 +54,8 @@ body {
 .kart-header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-medium);
-  padding: var(--spacing-medium);
+  gap: var(--pkt-spacing-16);
+  padding: var(--pkt-spacing-16);
   background: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -65,8 +72,8 @@ body {
 .controls {
   display: flex;
   align-items: center;
-  gap: var(--spacing-medium);
-  padding: var(--spacing-medium);
+  gap: var(--pkt-spacing-16);
+  padding: var(--pkt-spacing-16);
   background: #fff;
   border-bottom: 1px solid var(--neutral-border);
   flex-wrap: wrap;
@@ -112,10 +119,10 @@ body {
 }
 
 .search-input {
+  @include get-text("pkt-txt-16");
   width: 100%;
-  padding: var(--spacing-medium);
+  padding: var(--pkt-spacing-16);
   padding-left: #{map.get(pkt.$spacing, "size-40")}; // Plass til ikon
-  font-size: 16px;
   border: 1px solid var(--neutral-border);
   border-radius: 0; // Punkt bruker skarpe hjørner
   font-family: inherit;
@@ -157,8 +164,8 @@ body {
 .search-section-header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-small);
-  padding: var(--spacing-small) var(--spacing-medium);
+  gap: var(--pkt-spacing-8);
+  padding: var(--pkt-spacing-8) var(--pkt-spacing-16);
   font-size: 11px;
   font-weight: 600;
   color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
@@ -176,9 +183,9 @@ body {
 .search-suggestion {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: #{map.get(pkt.$spacing, "size-2")};
   width: 100%;
-  padding: var(--spacing-small) var(--spacing-medium);
+  padding: var(--pkt-spacing-8) var(--pkt-spacing-16);
   text-align: left;
   background: none;
   border: none;
@@ -196,21 +203,20 @@ body {
 }
 
 .suggestion-name {
-  font-size: 14px;
-  font-weight: 500;
+  @include get-text("pkt-txt-14-medium");
   color: var(--text-color);
 }
 
 .suggestion-address {
-  font-size: 12px;
+  @include get-text("pkt-txt-12");
   color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
 }
 
 .search-loading {
-  padding: var(--spacing-medium);
+  @include get-text("pkt-txt-14");
+  padding: var(--pkt-spacing-16);
   text-align: center;
   color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
-  font-size: 14px;
 }
 
 // ===========================================
@@ -276,19 +282,19 @@ body {
 }
 
 .area-filter-indicator {
+  @include get-text("pkt-txt-14");
   display: flex;
   align-items: center;
-  gap: var(--spacing-small);
-  padding: var(--spacing-small) var(--spacing-medium);
+  gap: var(--pkt-spacing-8);
+  padding: var(--pkt-spacing-8) var(--pkt-spacing-16);
   background: #{map.get(pkt.$pkt-colors, "brand-blue-300")};
   border-bottom: 2px solid var(--primary-color);
-  font-size: 13px;
 
   &::before {
+    @include get-text("pkt-txt-12");
     content: 'Viser steder i:';
     color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
-    font-size: 11px;
-    margin-right: 4px;
+    margin-right: #{map.get(pkt.$spacing, "size-4")};
   }
 }
 
@@ -299,12 +305,12 @@ body {
 }
 
 .area-filter-clear {
+  @include get-text("pkt-txt-14");
   background: none;
   border: none;
   color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
-  font-size: 14px;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: #{map.get(pkt.$spacing, "size-2")} #{map.get(pkt.$spacing, "size-8")};
   border-radius: 0; // Punkt bruker skarpe hjørner
 
   &:hover {
@@ -317,7 +323,7 @@ body {
   flex: 1;
   overflow-y: auto;
   background: var(--background-light);
-  padding: var(--spacing-medium);
+  padding: var(--pkt-spacing-16);
 }
 
 .store-list {
@@ -327,9 +333,9 @@ body {
 .store-item {
   display: flex;
   align-items: flex-start;
-  gap: var(--spacing-small);
-  padding: var(--spacing-small);
-  margin-bottom: var(--spacing-small);
+  gap: var(--pkt-spacing-8);
+  padding: var(--pkt-spacing-8);
+  margin-bottom: var(--pkt-spacing-8);
   border-bottom: 1px solid #{map.get(pkt.$pkt-colors, "brand-neutrals-200")};
   cursor: pointer;
 
@@ -380,10 +386,10 @@ body {
 
 .open-now-control {
   position: absolute;
-  top: var(--spacing-medium);
-  left: var(--spacing-medium);
+  top: var(--pkt-spacing-16);
+  left: var(--pkt-spacing-16);
   background: white;
-  padding: var(--spacing-small) var(--spacing-medium);
+  padding: var(--pkt-spacing-8) var(--pkt-spacing-16);
   border-radius: 0; // Punkt bruker skarpe hjørner
   box-shadow: #{map.get(pkt.$box-shadow, "medium")};
 
@@ -442,16 +448,16 @@ body {
 }
 
 .bottom-sheet-content {
-  padding: var(--spacing-medium);
+  padding: var(--pkt-spacing-16);
   padding-top: #{map.get(pkt.$spacing, "size-40")}; // Plass til close-button
 
   h3, .pkt-txt-18-medium {
-    margin-bottom: var(--spacing-medium);
+    margin-bottom: var(--pkt-spacing-16);
     color: var(--primary-color);
   }
 
   p {
-    margin-bottom: var(--spacing-small);
+    margin-bottom: var(--pkt-spacing-8);
   }
 
   // Punkt typography styling
@@ -489,8 +495,8 @@ body {
 // PktButton som close-button
 .close-btn {
   position: absolute;
-  top: var(--spacing-medium);
-  right: var(--spacing-medium);
+  top: var(--pkt-spacing-16);
+  right: var(--pkt-spacing-16);
   z-index: 1;
 }
 
@@ -499,12 +505,12 @@ body {
   max-height: 200px;
   object-fit: cover;
   border-radius: 0; // Punkt bruker skarpe hjørner
-  margin-bottom: var(--spacing-medium);
+  margin-bottom: var(--pkt-spacing-16);
 }
 
 .opening-hours ul {
   list-style: none;
-  margin-top: var(--spacing-small);
+  margin-top: var(--pkt-spacing-8);
 }
 
 // ===========================================
@@ -527,19 +533,19 @@ body {
 .modal-tip {
   position: relative;
   background: #fff;
-  padding: var(--spacing-large);
+  padding: var(--pkt-spacing-24);
   border-radius: 0; // Punkt bruker skarpe hjørner
   max-width: 400px;
   width: 90%;
 
   h2 {
-    margin-bottom: var(--spacing-medium);
+    margin-bottom: var(--pkt-spacing-16);
   }
 
   form {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-medium);
+    gap: var(--pkt-spacing-16);
   }
 
   // Punkt input/select styling - lar standard Punkt-styling gjelde
@@ -550,8 +556,8 @@ body {
 
 .close-tip {
   position: absolute;
-  top: var(--spacing-small);
-  right: var(--spacing-medium);
+  top: var(--pkt-spacing-8);
+  right: var(--pkt-spacing-16);
   font-size: 24px;
   background: none;
   border: none;
@@ -561,6 +567,56 @@ body {
 // Tips søkefelt autocomplete
 .tips-search-container {
   position: relative;
+}
+
+// Tips søkefelt med tøm-knapp
+.tips-search-input-wrapper {
+  position: relative;
+
+  // Legg til padding for tøm-knappen
+  .pkt-inputwrapper input {
+    padding-right: #{map.get(pkt.$spacing, "size-40")} !important;
+  }
+
+  // Posisjonering av tøm-knappen relativt til input-wrapperen
+  .pkt-inputwrapper {
+    position: relative;
+  }
+}
+
+.tips-search-clear-button {
+  position: absolute;
+  right: #{map.get(pkt.$spacing, "size-8")};
+  // Posisjonér relativt til input-feltet, ikke hele komponenten med label
+  bottom: #{map.get(pkt.$spacing, "size-12")};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
+  border-radius: 50%;
+  transition: color 0.15s, background-color 0.15s;
+  z-index: 2;
+
+  &:hover {
+    color: #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
+    background-color: #{map.get(pkt.$pkt-colors, "brand-neutrals-200")};
+  }
+
+  &:focus {
+    outline: 2px solid #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
+    outline-offset: 2px;
+  }
+}
+
+.tips-search-clear-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .modal-tip .autocomplete-dropdown {
@@ -582,7 +638,7 @@ body {
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: #{map.get(pkt.$spacing, "size-2")};
   border-bottom: 1px solid #{map.get(pkt.$pkt-colors, "brand-neutrals-200")};
   background-color: #ffffff;
 
@@ -596,12 +652,12 @@ body {
 }
 
 .modal-tip .autocomplete-main {
-  font-weight: 500;
+  @include get-text("pkt-txt-14-medium");
   color: #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
 }
 
 .modal-tip .autocomplete-secondary {
-  font-size: 0.875rem;
+  @include get-text("pkt-txt-14");
   color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
 }
 
@@ -612,16 +668,16 @@ body {
 }
 
 .modal-tip .tips-no-results {
-  font-size: 0.875rem;
+  @include get-text("pkt-txt-14");
   color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
-  margin-top: var(--spacing-small);
+  margin-top: var(--pkt-spacing-8);
 }
 
 .tips-selected-place {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: var(--spacing-medium);
+  padding: var(--pkt-spacing-16);
   background-color: #{map.get(pkt.$pkt-colors, "brand-blue-300")};
   border: 2px solid #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
 }
@@ -629,26 +685,26 @@ body {
 .tips-selected-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: #{map.get(pkt.$spacing, "size-4")};
 
   strong {
-    font-weight: 500;
+    @include get-text("pkt-txt-14-medium");
     color: #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
   }
 
   span {
-    font-size: 0.875rem;
+    @include get-text("pkt-txt-14");
     color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
   }
 }
 
 .tips-change-place {
+  @include get-text("pkt-txt-14");
   background: none;
   border: none;
   color: #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
   cursor: pointer;
   text-decoration: underline;
-  font-size: 0.875rem;
   padding: 0;
 
   &:hover {
@@ -675,7 +731,7 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  gap: var(--spacing-medium);
+  gap: var(--pkt-spacing-16);
 }
 
 .spinner {
@@ -717,10 +773,9 @@ body {
     margin-bottom: #{map.get(pkt.$spacing, "size-12")};
 
     h3 {
+      @include get-text("pkt-txt-18-medium");
       margin: 0;
       color: #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
-      font-size: 18px;
-      font-weight: 500;
     }
   }
 
@@ -755,20 +810,19 @@ body {
     }
 
     dt {
+      @include get-text("pkt-txt-14-medium");
       flex-shrink: 0;
       width: 120px;
       color: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
-      font-size: 14px;
-      font-weight: 500;
       display: flex;
       align-items: flex-start;
       gap: #{map.get(pkt.$spacing, "size-8")};
     }
 
     dd {
+      @include get-text("pkt-txt-14");
       margin: 0;
       flex: 1;
-      font-size: 14px;
     }
   }
 
@@ -802,17 +856,17 @@ body {
 
   h3 {
     color: var(--primary-color);
-    margin-bottom: var(--spacing-small);
+    margin-bottom: var(--pkt-spacing-8);
   }
 
   img {
     width: 100%;
     border-radius: 0; // Punkt bruker skarpe hjørner
-    margin-bottom: var(--spacing-small);
+    margin-bottom: var(--pkt-spacing-8);
   }
 
   p {
-    margin-bottom: var(--spacing-small);
+    margin-bottom: var(--pkt-spacing-8);
   }
 
   a {
@@ -826,9 +880,17 @@ body {
 
 // ===========================================
 // Responsiv design
+// Bruker Punkt breakpoints:
+// - mobile: 0 til 575px
+// - phablet: 576px til 767px
+// - tablet: 768px til 1023px
+// - tablet-big: 1024px til 1279px
+// - laptop: 1280px til 1599px
+// - desktop: 1600px og opp
 // ===========================================
 
-@media (max-width: 600px) {
+// Mobil-layout (opp til 575px)
+@include bp('mobile') {
   .sidebar-container {
     display: none;
   }
@@ -845,5 +907,26 @@ body {
   .tips-button {
     top: #{map.get(pkt.$spacing, "size-8")};
     right: #{map.get(pkt.$spacing, "size-8")};
+  }
+}
+
+// Phablet og opp (576px+) - vis sidebar
+@include bp('phablet-up') {
+  .sidebar-container {
+    display: flex;
+  }
+}
+
+// Tablet og opp (768px+) - større sidebar
+@include bp('tablet-up') {
+  .sidebar-container {
+    width: 320px;
+  }
+}
+
+// Laptop og opp (1280px+) - enda større sidebar
+@include bp('laptop-up') {
+  .sidebar-container {
+    width: 380px;
   }
 }
