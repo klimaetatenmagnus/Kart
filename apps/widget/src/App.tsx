@@ -8,6 +8,7 @@ import { BottomSheet } from './components/BottomSheet'
 import { TipsModal } from './components/TipsModal'
 import { useKartinstans } from './hooks/useKartinstans'
 import { useSteder } from './hooks/useSteder'
+import { useOpenNowStatus } from './hooks/useOpenNowStatus'
 import type { StedDTO, PlaceDetails } from '@klimaoslo-kart/shared'
 
 // Parse URL-parametre for embed-innstillinger
@@ -31,6 +32,7 @@ function App() {
 
   const { kartinstans, loading: kartLoading, error: kartError } = useKartinstans(slug)
   const { steder, loading: stederLoading } = useSteder(slug)
+  const { openNowStatus, isLoading: openNowLoading, fetchOpenNowStatus, clearStatus } = useOpenNowStatus()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set())
@@ -61,19 +63,48 @@ function App() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Filtrer steder basert på kategorier (søk brukes kun for autocomplete-forslag)
-  const filteredSteder = steder.filter((sted) => {
-    // Hvis det ikke er noen kategorier definert, vis alle steder
-    if (!kartinstans?.kategorier || kartinstans.kategorier.length === 0) {
+  // Filtrer steder basert på kategorier og åpen nå-filter
+  const filteredSteder = useMemo(() => {
+    return steder.filter((sted) => {
+      // Kategorifiltrering
+      if (kartinstans?.kategorier && kartinstans.kategorier.length > 0) {
+        if (!sted.kategoriId) {
+          return false
+        }
+        if (!selectedCategories.has(sted.kategoriId)) {
+          return false
+        }
+      }
+
+      // Åpen nå-filtrering
+      // Når filteret er aktivt, vis kun steder som er bekreftet åpne
+      if (openNowFilter && openNowStatus.size > 0) {
+        const isOpen = openNowStatus.get(sted.placeId)
+        // Vis stedet kun hvis det er åpent (true)
+        // Steder med ukjent status (null) eller lukket (false) filtreres bort
+        if (isOpen !== true) {
+          return false
+        }
+      }
+
       return true
+    })
+  }, [steder, kartinstans?.kategorier, selectedCategories, openNowFilter, openNowStatus])
+
+  // Håndter endring av "Åpen nå"-filter
+  // Henter faktisk åpen-status fra Google Places API når filteret aktiveres
+  const handleOpenNowChange = useCallback(async (enabled: boolean) => {
+    setOpenNowFilter(enabled)
+
+    if (enabled) {
+      // Hent status for alle steder når filteret aktiveres
+      // Dette sikrer at vi alltid bruker tidspunktet brukeren aktiverer filteret
+      await fetchOpenNowStatus(steder, true) // forceRefresh = true for fersk data
+    } else {
+      // Tøm status når filteret deaktiveres
+      clearStatus()
     }
-    // Hvis det er kategorier definert, vis bare steder med kategori som er valgt
-    // Steder uten kategori vises ikke når det finnes kategorier
-    if (!sted.kategoriId) {
-      return false
-    }
-    return selectedCategories.has(sted.kategoriId)
-  })
+  }, [steder, fetchOpenNowStatus, clearStatus])
 
   // Filtrer steder for sidebar basert på valgt område
   const sidebarSteder = selectedArea
@@ -233,7 +264,8 @@ function App() {
             onStedDeselect={handleCloseDetails}
             selectedStedId={selectedSted?.id}
             openNowFilter={openNowFilter}
-            onOpenNowChange={setOpenNowFilter}
+            onOpenNowChange={handleOpenNowChange}
+            openNowLoading={openNowLoading}
             onMapReady={handleMapReady}
           />
           <PktButton

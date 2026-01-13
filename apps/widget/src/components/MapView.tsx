@@ -25,6 +25,7 @@ interface MapViewProps {
   selectedStedId?: string
   openNowFilter: boolean
   onOpenNowChange: (value: boolean) => void
+  openNowLoading?: boolean
   onMapReady?: () => void
 }
 
@@ -36,6 +37,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   selectedStedId: _selectedStedId, // For fremtidig bruk (markere valgt sted)
   openNowFilter,
   onOpenNowChange,
+  openNowLoading = false,
   onMapReady,
 }, ref) {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -227,6 +229,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
             label="Åpen nå"
             checked={openNowFilter}
             onChange={(e) => onOpenNowChange(e.target.checked)}
+            disabled={openNowLoading}
           />
         </div>
       )}

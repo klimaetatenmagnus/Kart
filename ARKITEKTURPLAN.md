@@ -17,6 +17,7 @@
 14. [UI-migreringsplan: Punkt designsystem](#ui-migreringsplan-punkt-designsystem)
 15. [Admin-app: Punkt Designsystem Migreringsplan](#admin-app-punkt-designsystem-migreringsplan)
 16. [Neste steg](#neste-steg)
+17. [E-postvarsling for tips](#e-postvarsling-for-tips)
 
 ---
 
@@ -98,6 +99,10 @@ Målet er å bygge en selvhostet kartplattform på Google Cloud som:
 | 2026-01-13 | **Typografi-revisjon:** Alle hardkodede font-size verdier erstattet med Punkt `get-text()` SCSS-mixin. | Fullført |
 | 2026-01-13 | Widget og admin SCSS oppdatert til å importere `@oslokommune/punkt-css/dist/scss/abstracts/mixins/typography`. | Fullført |
 | 2026-01-13 | Typografi i InfoWindowContent, søkefelt, sidebar, tips-modal, admin-tabeller etc. følger nå Punkt-retningslinjer. | Fullført |
+| 2026-01-13 | **"Åpen nå"-filter reimplementert:** Sanntidssjekk ved aktivering erstatter periodisk oppdatering. | Fullført |
+| 2026-01-13 | Nytt batch-endepunkt `/api/public/places/open-now-batch` for effektiv statussjekk av flere steder. | Fullført |
+| 2026-01-13 | `useOpenNowStatus` hook opprettet for å håndtere henting og caching av åpen-status. | Fullført |
+| 2026-01-13 | Filtreringslogikk i App.tsx oppdatert til å faktisk filtrere basert på åpen-status. | Fullført |
 
 ---
 
@@ -254,7 +259,7 @@ HTML/JS-widget (PapaParse + Google Maps API)
 ### Eksisterende funksjoner
 - Kategorier med fargekoder (hovedkategorier + underkategorier)
 - Søk i butikknavn
-- "Åpen nå"-filter med periodisk oppdatering (10 min)
+- "Åpen nå"-filter med sanntidssjekk ved aktivering
 - Responsivt design (bottom sheet på mobil)
 - "Tips oss"-skjema for brukerinnspill
 - Sidebar med liste over steder
@@ -585,7 +590,7 @@ Når bruker velger et sted fra autocomplete-listen:
 ### Funksjoner (bevart fra eksisterende løsning)
 - [x] Søk i stedsnavn
 - [x] Kategorifiltrering med fargekodet checkboxer
-- [x] "Åpen nå"-filter med periodisk oppdatering
+- [x] "Åpen nå"-filter med sanntidssjekk ved aktivering
 - [x] Sidebar med liste over steder
 - [x] Infovindu med stedsdetaljer (desktop)
 - [x] Bottom sheet (mobil)
@@ -674,7 +679,7 @@ Brukere kan søke etter områder/nabolag i tillegg til stedsnavn. Når de velger
 5. Render kart med markører og sidebar
            │
            ▼
-6. Periodisk oppdatering av "åpen nå"-status (10 min)
+6. Ved aktivering av "Åpen nå"-filter: Hent sanntidsstatus fra Google Places API
 ```
 
 ---
@@ -838,6 +843,8 @@ DELETE /api/images/:placeId                       # Slett cachet bilde
 ```
 GET    /api/public/kartinstanser/:slug           # Hent kartconfig
 GET    /api/public/kartinstanser/:slug/steder    # Hent steder
+GET    /api/public/places/details?placeId=X      # Hent stedsdetaljer (åpningstider, bilder, etc.)
+GET    /api/public/places/open-now-batch?placeIds=X,Y,Z  # Batch-sjekk åpen nå-status
 POST   /api/public/tips                          # Send inn tips
 ```
 
@@ -948,9 +955,10 @@ Lagret i Google Secret Manager, brukes kun av:
 Offentlige endepunkter er beskyttet mot misbruk:
 
 ```
-/api/public/places/autocomplete  → 30 req/min per IP
-/api/public/places/details       → 30 req/min per IP
-/api/public/tips                 → 5 req/min per IP
+/api/public/places/autocomplete    → 30 req/min per IP
+/api/public/places/details         → 30 req/min per IP
+/api/public/places/open-now-batch  → 30 req/min per IP
+/api/public/tips                   → 5 req/min per IP
 ```
 
 Implementert med `express-rate-limit` i `apps/backend/src/routes/public.ts`.
@@ -2518,6 +2526,227 @@ Erstatt nåværende CSS custom properties:
 
 **Fremtidige forbedringer (Fase 6):**
 - Tips-handtering i admin (godkjenn/avvis)
+- **E-postvarsling for nye tips** (krever Azure AD, se egen seksjon)
 - Statistikk og analyse
 - Bulk-import fra CSV
 - Ytterligere Punkt-migrering (SearchBar, CategoryFilter, Sidebar, BottomSheet)
+
+---
+
+## E-postvarsling for tips
+
+### Forutsetninger
+
+Denne funksjonaliteten krever at Azure AD-autentisering er på plass, fordi:
+- Verifiserte e-postadresser kommer automatisk fra innlogging
+- Microsoft Graph API kan brukes for e-postsending
+- `opprettetAv`-feltet gir tydelig eierskap til kartinstanser
+
+### Utvidet kartinstans-schema
+
+```javascript
+// kartinstanser/{id}
+{
+  // ... eksisterende felter ...
+  opprettetAv: "bruker@oslo.kommune.no",
+
+  // Nytt: varslingsinnstillinger
+  varsling: {
+    tipsVarsling: true,                          // Motta varsler om nye tips
+    varslingsEpost: "bruker@oslo.kommune.no",    // Kan overstyres
+    varslingFrekvens: "umiddelbart"              // "umiddelbart" | "daglig" | "ukentlig"
+  }
+}
+```
+
+### E-posttjeneste
+
+**Anbefalt: Microsoft Graph API** (allerede i Microsoft-økosystemet)
+
+```typescript
+// apps/backend/src/services/email.ts
+import { Client } from '@microsoft/microsoft-graph-client';
+
+interface TipsVarslingParams {
+  til: string;
+  kartNavn: string;
+  tipsData: {
+    butikknavn: string;
+    adresse: string;
+    kategori: string;
+  };
+}
+
+export async function sendTipsVarsling({ til, kartNavn, tipsData }: TipsVarslingParams) {
+  const client = Client.init({
+    authProvider: (done) => {
+      done(null, process.env.GRAPH_API_TOKEN);
+    }
+  });
+
+  await client.api('/me/sendMail').post({
+    message: {
+      subject: `Nytt tips til kartet "${kartNavn}"`,
+      body: {
+        contentType: 'HTML',
+        content: `
+          <h2>Nytt tips mottatt</h2>
+          <p><strong>Sted:</strong> ${tipsData.butikknavn}</p>
+          <p><strong>Adresse:</strong> ${tipsData.adresse}</p>
+          <p><strong>Kategori:</strong> ${tipsData.kategori}</p>
+          <p><a href="https://admin.kart.klimaoslo.no/tips">Gå til tips-oversikten</a></p>
+        `
+      },
+      toRecipients: [{ emailAddress: { address: til } }]
+    }
+  });
+}
+```
+
+### Backend-integrasjon
+
+```typescript
+// apps/backend/src/routes/public.ts (oppdatert)
+
+router.post('/tips', rateLimiter, async (req, res) => {
+  const { kartinstansId, butikknavn, adresse, kategori, placeId } = req.body;
+
+  // Lagre tips
+  const tipsData = {
+    kartinstansId,
+    butikknavn,
+    adresse,
+    kategori,
+    placeId,
+    status: 'ny',
+    opprettet: new Date()
+  };
+
+  const tipDoc = await db.collection('tips').add(tipsData);
+
+  // Hent kartinstans for varsling
+  const kartinstans = await db.collection('kartinstanser')
+    .doc(kartinstansId)
+    .get();
+
+  const data = kartinstans.data();
+  const varsling = data?.varsling;
+
+  // Send umiddelbar varsling hvis aktivert
+  if (varsling?.tipsVarsling && varsling.varslingFrekvens === 'umiddelbart') {
+    try {
+      await sendTipsVarsling({
+        til: varsling.varslingsEpost,
+        kartNavn: data.navn,
+        tipsData
+      });
+    } catch (error) {
+      console.error('Kunne ikke sende tipsvarsling:', error);
+      // Ikke fail request selv om e-post feiler
+    }
+  }
+
+  res.status(201).json({ id: tipDoc.id });
+});
+```
+
+### Cloud Function for daglig/ukentlig digest
+
+```typescript
+// apps/backend/src/functions/sendTipsDigest.ts
+import * as functions from '@google-cloud/functions-framework';
+import { Firestore } from '@google-cloud/firestore';
+import { sendTipsVarsling } from '../services/email';
+
+const db = new Firestore();
+
+functions.http('sendTipsDigest', async (req, res) => {
+  const frekvens = req.query.frekvens as string; // 'daglig' | 'ukentlig'
+
+  // Finn kartinstanser med denne varslingsfrekvensen
+  const kartinstanser = await db
+    .collection('kartinstanser')
+    .where('varsling.tipsVarsling', '==', true)
+    .where('varsling.varslingFrekvens', '==', frekvens)
+    .get();
+
+  for (const kartDoc of kartinstanser.docs) {
+    const kart = kartDoc.data();
+
+    // Finn nye tips siden forrige digest
+    const sisteSjekk = frekvens === 'daglig'
+      ? new Date(Date.now() - 24 * 60 * 60 * 1000)
+      : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const nyeTips = await db
+      .collection('tips')
+      .where('kartinstansId', '==', kartDoc.id)
+      .where('opprettet', '>=', sisteSjekk)
+      .where('status', '==', 'ny')
+      .get();
+
+    if (nyeTips.size > 0) {
+      await sendDigestEmail({
+        til: kart.varsling.varslingsEpost,
+        kartNavn: kart.navn,
+        antallTips: nyeTips.size,
+        tips: nyeTips.docs.map(d => d.data())
+      });
+    }
+  }
+
+  res.json({ status: 'ok' });
+});
+```
+
+### Cloud Scheduler-oppsett
+
+```bash
+# Daglig digest kl. 08:00
+gcloud scheduler jobs create http daily-tips-digest \
+  --location=europe-west1 \
+  --schedule="0 8 * * *" \
+  --uri="https://europe-west1-bruktbutikk-navn.cloudfunctions.net/sendTipsDigest?frekvens=daglig" \
+  --http-method=GET \
+  --oidc-service-account-email=scheduler@bruktbutikk-navn.iam.gserviceaccount.com
+
+# Ukentlig digest mandager kl. 08:00
+gcloud scheduler jobs create http weekly-tips-digest \
+  --location=europe-west1 \
+  --schedule="0 8 * * 1" \
+  --uri="https://europe-west1-bruktbutikk-navn.cloudfunctions.net/sendTipsDigest?frekvens=ukentlig" \
+  --http-method=GET \
+  --oidc-service-account-email=scheduler@bruktbutikk-namn.iam.gserviceaccount.com
+```
+
+### Admin UI: Varslingsinnstillinger
+
+Legges til i KartinstansEditor under grunninnstillinger:
+
+```
+┌─ VARSLINGSINNSTILLINGER ─────────────────────────────────────┐
+│                                                               │
+│  ☑ Varsle meg om nye tips til dette kartet                   │
+│                                                               │
+│  E-post: [rikke.dahl@oslo.kommune.no        ]                │
+│  (Forhåndsutfylt med innlogget brukers e-post)               │
+│                                                               │
+│  Hvor ofte?                                                   │
+│  ○ Umiddelbart (e-post for hvert tips)                       │
+│  ○ Daglig oppsummering (kl. 08:00)                           │
+│  ○ Ukentlig oppsummering (mandager kl. 08:00)                │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+### Implementeringsrekkefølge
+
+1. **Etter Azure AD er på plass:**
+   - Utvid `kartinstanser`-schema med `varsling`-felt
+   - Legg til varslingsinnstillinger i KartinstansEditor
+   - Implementer `sendTipsVarsling` med Microsoft Graph API
+
+2. **Deretter:**
+   - Oppdater `/api/public/tips` til å trigge umiddelbar varsling
+   - Deploy Cloud Function for digest
+   - Sett opp Cloud Scheduler-jobber

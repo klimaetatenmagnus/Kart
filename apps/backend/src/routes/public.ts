@@ -156,6 +156,62 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
   }
 })
 
+// Batch-sjekk av åpen nå-status for flere steder (offentlig, rate limited)
+// Brukes av "Åpen nå"-filteret for å hente faktisk status på tidspunktet filteret aktiveres
+publicRouter.get('/places/open-now-batch', placesRateLimiter, async (req, res) => {
+  try {
+    const { placeIds } = req.query
+
+    if (!placeIds || typeof placeIds !== 'string') {
+      return res.status(400).json({ success: false, error: 'Mangler placeIds-parameter' })
+    }
+
+    const ids = placeIds.split(',').filter(id => id.trim())
+
+    if (ids.length === 0) {
+      return res.json({ success: true, data: {} })
+    }
+
+    // Begrens antall steder per forespørsel for å unngå overbelastning
+    if (ids.length > 50) {
+      return res.status(400).json({
+        success: false,
+        error: 'For mange steder. Maks 50 per forespørsel.'
+      })
+    }
+
+    // Hent åpen/lukket-status for alle steder parallelt
+    const results = await Promise.all(
+      ids.map(async (placeId) => {
+        try {
+          const response = await fetch(
+            `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=opening_hours&key=${GOOGLE_PLACES_API_KEY}`
+          )
+          const data = await response.json()
+
+          // open_now er beregnet av Google basert på nåværende tidspunkt
+          const isOpen = data.result?.opening_hours?.open_now ?? null
+          return { placeId, isOpen }
+        } catch {
+          // Returnerer null hvis vi ikke får svar, så stedet vises uansett
+          return { placeId, isOpen: null }
+        }
+      })
+    )
+
+    // Bygg et map fra placeId til åpen-status
+    const statusMap: Record<string, boolean | null> = {}
+    for (const result of results) {
+      statusMap[result.placeId] = result.isOpen
+    }
+
+    res.json({ success: true, data: statusMap })
+  } catch (err) {
+    console.error('Error fetching open-now batch:', err)
+    res.status(500).json({ success: false, error: 'Kunne ikke hente åpningsstatus' })
+  }
+})
+
 // Send inn tips (offentlig, rate limited)
 publicRouter.post('/tips', tipsRateLimiter, async (req, res) => {
   try {
