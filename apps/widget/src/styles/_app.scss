@@ -981,8 +981,14 @@ body {
     align-self: flex-start;
   }
 
-  .tips-button {
+  .open-now-control {
     top: #{map.get(pkt.$spacing, "size-8")};
+    left: #{map.get(pkt.$spacing, "size-8")};
+  }
+
+  .tips-button {
+    // Juster top for å vertikalt midtstille med open-now-control
+    top: #{map.get(pkt.$spacing, "size-4")};
     right: #{map.get(pkt.$spacing, "size-8")};
   }
 }
