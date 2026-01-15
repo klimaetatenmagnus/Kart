@@ -61,6 +61,29 @@ Dette dokumentet beskriver steg-for-steg deployment av KlimaOslo Kartplattform t
 
 ---
 
+## ⚠️ VIKTIG: API-nøkkel uten restriksjoner
+
+**Referrer-restriksjoner er midlertidig fjernet fra Frontend API-nøkkelen** (2026-01-14).
+
+### Bakgrunn:
+Legacy-kartet på klimaoslo.no (hostet av ekstern leverandør) sluttet å fungere etter at referrer-restriksjoner ble lagt til. Leverandørens implementasjon bruker Places API på en måte som ikke støtter referrer-restriksjoner.
+
+### Nåværende status:
+- **Frontend API-nøkkel:** `AIzaSyDd7CyClS1TpajkVAuDgNB32z6NPGM4fSs` - INGEN restriksjoner
+- **Risiko:** Nøkkelen kan potensielt misbrukes fra andre domener
+
+### Ved lansering av ny løsning MÅ du:
+1. Gjenopprette referrer-restriksjoner på frontend-nøkkelen:
+   ```bash
+   gcloud services api-keys update projects/412468299057/locations/global/keys/896b9161-e200-4c9c-a95d-2bc4f891b99e \
+     --allowed-referrers="https://kart.klimaoslo.no/*,https://admin.kart.klimaoslo.no/*,https://klimaoslo-kart-widget-412468299057.europe-west1.run.app/*,https://klimaoslo-kart-admin-412468299057.europe-west1.run.app/*,http://localhost:3000/*,http://localhost:3001/*,https://www.klimaoslo.no/*,https://klimaoslo.no/*" \
+     --project=bruktbutikk-navn
+   ```
+2. Vurdere om legacy-kartet fortsatt skal støttes, eller om det kan fases ut
+3. Eventuelt opprette en egen API-nøkkel for legacy-kartet med IP-restriksjoner
+
+---
+
 ## Fremdriftsstatus
 
 ### Oversikt
@@ -72,9 +95,9 @@ Fase 3b: Bildecache-impl.       [##########] 100% - FULLFORT
 Fase 4:  Dockerfiler            [##########] 100% - FULLFORT
 Fase 5:  Cloud Run              [##########] 100% - FULLFORT - Alle tjenester deployet!
 Fase 6:  Scheduler/Functions    [#####     ] 50%  - Kode opprettet, deployment gjenstår
-Fase 7:  Domene og SSL          [          ] 0%   - Krever DNS-tilgang
+Fase 7:  Domene og SSL          [##########] 100% - FULLFØRT - Custom domains aktive!
 Fase 8:  CI/CD (GitHub Actions) [##########] 100% - FULLFØRT - Selektiv deployment konfigurert
-Fase 9:  Azure AD               [          ] 0%   - Krever Azure-tilgang
+Fase 9:  Azure AD               [###       ] 30%  - Bestilling sendt til Entra-teamet
 Fase 10: Verifisering           [######    ] 60%  - Widget og Admin testet, migrering gjenstår
 ```
 
@@ -122,6 +145,12 @@ Fase 10: Verifisering           [######    ] 60%  - Widget og Admin testet, migr
 | 2026-01-13 | **GitHub Actions workflows** | Fullført | Selektiv deployment med path-filtre |
 | 2026-01-13 | **Workload Identity Federation** | Fullført | GitHub Actions → GCP autentisering uten nøkkelfiler |
 | 2026-01-13 | **GitHub Secrets konfigurert** | Fullført | WIF, Maps API-nøkkel, Azure placeholders |
+| 2026-01-14 | **Referrer-restriksjoner fjernet** | Midlertidig | Legacy-kart på klimaoslo.no krevde dette - MÅ GJENOPPRETTES |
+| 2026-01-15 | **DNS konfigurert (Fase 7.2)** | Fullført | CNAME-records lagt til i Uniweb (one.com) |
+| 2026-01-15 | **Domain mapping (Fase 7.1)** | Fullført | Alle tre domener mappet til Cloud Run |
+| 2026-01-15 | **SSL-sertifikater (Fase 7.3)** | Fullført | Automatisk provisjonert av Google |
+| 2026-01-15 | **Custom domains aktive** | Fullført | kart.klimaoslo.no, admin.kart.klimaoslo.no, api.kart.klimaoslo.no |
+| 2026-01-15 | **Entra ID-bestilling sendt** | Pågår | Bestilling sendt via Kompass (M365 Henvendelse) |
 | | | | |
 
 ---
@@ -138,8 +167,8 @@ Fase 10: Verifisering           [######    ] 60%  - Widget og Admin testet, migr
 - [x] Node.js 20.x
 
 ### Trenger tilgang/avklaring
-- [ ] Tilgang til kart.klimaoslo.no DNS-administrasjon
-- [ ] Azure AD app-registrering for Oslo kommune
+- [x] Tilgang til kart.klimaoslo.no DNS-administrasjon (Uniweb - fullført 2026-01-15)
+- [ ] Azure AD app-registrering for Oslo kommune (bestilling sendt 2026-01-15)
 - [ ] Bekreftelse av GCP billing-konto
 
 ### Nodvendige verktoy
@@ -1237,9 +1266,12 @@ gcloud beta run domain-mappings create \
   --region=europe-west1
 ```
 
-**Status:** [ ] Ikke startet
+**Status:** [x] Fullført (2026-01-15)
 
 ### 7.2 DNS-konfigurasjon
+
+**DNS-leverandør:** Uniweb / GROUP.ONE NORWAY AS (one.com)
+**Kontrollpanel:** https://www.uniweb.no
 
 Legg til folgende DNS-records hos domeneadministrator:
 
@@ -1258,7 +1290,7 @@ dig admin.kart.klimaoslo.no CNAME
 dig api.kart.klimaoslo.no CNAME
 ```
 
-**Status:** [ ] Ikke startet
+**Status:** [x] Fullført (2026-01-15)
 
 ### 7.3 Verifiser SSL-sertifikater
 
@@ -1270,7 +1302,7 @@ gcloud beta run domain-mappings describe \
   --region=europe-west1
 ```
 
-**Status:** [ ] Ikke startet
+**Status:** [x] Fullført (2026-01-15) - Alle sertifikater provisjonert
 
 ### 7.4 Oppdater GitHub Actions workflows med custom domains
 
@@ -1298,7 +1330,7 @@ gh workflow run "Deploy Admin"
 gh workflow run "Deploy Widget"
 ```
 
-**Status:** [ ] Ikke startet (venter på DNS-konfigurasjon)
+**Status:** [ ] Ikke startet - DNS er nå klart, kan oppdateres når Entra ID er konfigurert
 
 ---
 
@@ -1548,7 +1580,7 @@ curl -w "@curl-format.txt" -o /dev/null -s https://kart.klimaoslo.no/
 - [ ] Admin krever innlogging
 - [x] API-nokler korrekt separert (se Fase 2b nedenfor)
 - [x] Rate limiting på offentlige endepunkter
-- [x] HTTP referrer-restriksjoner på frontend-nøkkel
+- [ ] HTTP referrer-restriksjoner på frontend-nøkkel (MIDLERTIDIG FJERNET - se advarsel øverst)
 
 ### 10.4 Migrering av eksisterende data (bildecache)
 
@@ -1653,24 +1685,25 @@ Til:
 
 ### Umiddelbare oppgaver (Prioritert)
 
-1. **Verifiser GCP-tilgang** - Sjekk at du har nodvendige rettigheter i prosjektet
-2. **Installer gcloud CLI** - Folg instruksjonene i Forutsetninger
-3. **Aktiver API-er** - Kjor kommandoene i Fase 1.2
-4. **Opprett Dockerfiler** - Start med backend, test lokalt
+1. **Vente på Entra ID-konfigurasjon** - Bestilling sendt 2026-01-15, venter på svar fra Entra-teamet
+2. **Oppdater GitHub Secrets** - Legg inn `AZURE_CLIENT_ID` og `AZURE_TENANT_ID` når mottatt
+3. **Oppdater GitHub Actions workflows** - Endre til custom domain URLs (Fase 7.4)
+4. **Deaktiver DEV_MODE** - Fjern `DEV_MODE` og `VITE_SKIP_AUTH` i produksjon
+5. **Gjenopprett API-nøkkel restriksjoner** - Se advarsel øverst i dokumentet
 
 ### Avhengigheter og blokkere
 
 | Oppgave | Avhengig av | Blokker |
 |---------|-------------|---------|
-| Cloud Run deploy | Dockerfiler, Artifact Registry | |
-| Domene-mapping | DNS-tilgang | Hvem administrerer klimaoslo.no DNS? |
-| Azure AD | App-registrering i Oslo kommune tenant | Tilgang til Azure AD |
-| CI/CD | ~~GitHub repo, Cloud Build trigger~~ | ✅ Fullført |
+| ~~Cloud Run deploy~~ | ~~Dockerfiler, Artifact Registry~~ | ✅ Fullført |
+| ~~Domene-mapping~~ | ~~DNS-tilgang~~ | ✅ Fullført (Uniweb) |
+| Azure AD-integrasjon | App-registrering i Oslo kommune tenant | Venter på Entra-teamet |
+| ~~CI/CD~~ | ~~GitHub repo, Cloud Build trigger~~ | ✅ Fullført |
 
-### Sporsmal som ma avklares
+### Sporsmal som er avklart
 
-1. **DNS-administrasjon:** Hvem har tilgang til a opprette DNS-records for klimaoslo.no?
-2. **Azure AD:** Har du tilgang til a registrere apper i Oslo kommune sin Azure AD tenant?
+1. ~~**DNS-administrasjon:** Hvem har tilgang til a opprette DNS-records for klimaoslo.no?~~ ✅ Uniweb/one.com
+2. **Azure AD:** ~~Har du tilgang til a registrere apper i Oslo kommune sin Azure AD tenant?~~ Bestilling sendt via Kompass
 3. ~~**GitHub:** Skal koden ligge i et eksisterende repo, eller opprettes nytt?~~ ✅ https://github.com/klimaetatenmagnus/Kart
 4. **Backup:** Onskes automatisk backup av Firestore-data?
 
@@ -1771,4 +1804,4 @@ gcloud run services logs read klimaoslo-kart-api --region=europe-west1 --limit=1
 
 ---
 
-*Sist oppdatert: 2026-01-13 (GitHub Actions med Workload Identity Federation, selektiv deployment)*
+*Sist oppdatert: 2026-01-15 (Custom domains konfigurert, Entra ID-bestilling sendt)*

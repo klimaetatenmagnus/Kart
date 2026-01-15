@@ -40,3 +40,7 @@ apps/**/node_modules/.vite/
 
 # Claude Code
 .claude/
+
+# Markdown-filer (unntatt README)
+*.md
+!README.md

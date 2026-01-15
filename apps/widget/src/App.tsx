@@ -271,7 +271,7 @@ function App() {
           <PktButton
             className="tips-button"
             skin="primary"
-            size="medium"
+            size={isMobile ? "small" : "medium"}
             variant="icon-left"
             iconName="bullseye"
             onClick={() => setShowTipsModal(true)}

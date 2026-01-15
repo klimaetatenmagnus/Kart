@@ -103,6 +103,7 @@ Målet er å bygge en selvhostet kartplattform på Google Cloud som:
 | 2026-01-13 | Nytt batch-endepunkt `/api/public/places/open-now-batch` for effektiv statussjekk av flere steder. | Fullført |
 | 2026-01-13 | `useOpenNowStatus` hook opprettet for å håndtere henting og caching av åpen-status. | Fullført |
 | 2026-01-13 | Filtreringslogikk i App.tsx oppdatert til å faktisk filtrere basert på åpen-status. | Fullført |
+| 2026-01-14 | **Legend-komponent implementert** - Kategoriforklaring i nedre venstre hjørne av kartet med Punkt-styling. | Fullført |
 
 ---
 
@@ -138,9 +139,9 @@ Kart/
 │   ├── widget/                 # Kartwidget (React + Vite + Google Maps)
 │   │   ├── .env                # VITE_GOOGLE_MAPS_API_KEY
 │   │   ├── src/
-│   │   │   ├── components/     # MapView, Sidebar, BottomSheet, etc.
-│   │   │   ├── hooks/          # useKartinstans, useSteder
-│   │   │   └── styles/         # CSS
+│   │   │   ├── components/     # MapView, Sidebar, BottomSheet, Legend, etc.
+│   │   │   ├── hooks/          # useKartinstans, useSteder, useOpenNowStatus
+│   │   │   └── styles/         # SCSS med Punkt-variabler
 │   │   └── package.json
 │   └── backend/                # API (Node.js + Express)
 │       ├── .env                # SKIP_AUTH=true, GOOGLE_PLACES_API_KEY
@@ -596,9 +597,10 @@ Når bruker velger et sted fra autocomplete-listen:
 - [x] Bottom sheet (mobil)
 - [x] Responsivt design
 - [x] Fullskjerm-modus
+- [x] Kategori-legend (fargeforklaring)
 
 ### Nye funksjoner
-- [x] Punkt designsystem-komponenter (TipsModal, InfoWindow, MapView, CategoryFilter, skarpe hjørner)
+- [x] Punkt designsystem-komponenter (TipsModal, InfoWindow, MapView, CategoryFilter, Legend, skarpe hjørner)
 - [ ] Forbedret tilgjengelighet (WCAG 2.1)
 - [ ] Mørk modus (følger system/brukerpreferanse)
 - [ ] Deling av spesifikt sted (URL med place_id)
@@ -1707,6 +1709,83 @@ import { PktCheckbox } from '@oslokommune/punkt-react'
     onChange={(e) => onOpenNowChange(e.target.checked)}
   />
 </div>
+```
+
+#### 6b. Legend.tsx (kategoriforklaring)
+
+**Nåværende:** Ingen legend i widget (kun i legacy-kart)
+**Punkt-erstatning:** Egendefinert komponent med Punkt-styling (typografi, spacing, farger, skygger)
+
+**Ny fil: `apps/widget/src/components/Legend.tsx`**
+
+```tsx
+import type { Kategori } from '@klimaoslo-kart/shared'
+
+interface LegendProps {
+  kategorier: Kategori[]
+}
+
+export function Legend({ kategorier }: LegendProps) {
+  if (kategorier.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="map-legend" role="region" aria-label="Kartlegende">
+      <h4 className="map-legend__title pkt-txt-14-medium">Kategorier</h4>
+      <ul className="map-legend__list">
+        {kategorier.map((kategori) => (
+          <li key={kategori.id} className="map-legend__item">
+            <span
+              className="map-legend__dot"
+              style={{ backgroundColor: kategori.farge }}
+              aria-hidden="true"
+            />
+            <span className="map-legend__label pkt-txt-14">{kategori.navn}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```
+
+**Styling i `_app.scss`:**
+```scss
+.map-legend {
+  position: absolute;
+  bottom: var(--pkt-spacing-24);
+  left: var(--pkt-spacing-16);
+  background: #{map.get(pkt.$pkt-colors, "brand-neutrals-white")};
+  padding: #{map.get(pkt.$spacing, "size-12")} #{map.get(pkt.$spacing, "size-16")};
+  border: 2px solid #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")};
+  box-shadow: #{map.get(pkt.$box-shadow, "medium")};
+  z-index: 100;
+  max-width: 200px;
+
+  &__title { /* Punkt pkt-txt-14-medium */ }
+  &__list { /* Flexbox column med gap */ }
+  &__item { /* Flex med gap */ }
+  &__dot { /* 12px sirkel med kategori-farge */ }
+  &__label { /* Punkt pkt-txt-14 */ }
+}
+
+// Responsiv variant for mobil
+@include bp('mobile') {
+  .map-legend {
+    /* Mindre padding, font og dot-størrelse */
+  }
+}
+```
+
+**Integrasjon i MapView.tsx:**
+```tsx
+import { Legend } from './Legend'
+
+// I return-statement:
+{kartinstans.kategorier.length > 0 && (
+  <Legend kategorier={kartinstans.kategorier} />
+)}
 ```
 
 #### 7. InfoWindow (stedsdetaljer på desktop) → InfoWindowContent.tsx

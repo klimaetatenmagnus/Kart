@@ -977,6 +977,10 @@ body {
     width: 100%;
   }
 
+  .category-filter {
+    align-self: flex-start;
+  }
+
   .tips-button {
     top: #{map.get(pkt.$spacing, "size-8")};
     right: #{map.get(pkt.$spacing, "size-8")};
