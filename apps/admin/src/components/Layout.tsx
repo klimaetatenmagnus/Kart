@@ -60,10 +60,10 @@ export function Layout() {
             <img
               src="https://www.klimaoslo.no/wp-content/uploads/sites/2/2025/02/Oslo-logo-sort-RGB.png"
               alt="Oslo kommune"
-              height="48"
+              height="64"
             />
           </Link>
-          <h1>KlimaOslo Kartadmin</h1>
+          <h1>KlimaOslo kartadmin</h1>
           {skipAuth && <span className="dev-badge">DEV</span>}
         </div>
         <div className="header-right">
