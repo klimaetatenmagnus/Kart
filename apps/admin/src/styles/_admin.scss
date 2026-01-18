@@ -19,8 +19,8 @@
   --color-success: #{map.get(pkt.$pkt-colors, "brand-green-1000")};
   --color-warning: #{map.get(pkt.$pkt-colors, "brand-yellow-1000")};
 
-  --color-text: #{map.get(pkt.$pkt-colors, "grays-gray-800")};
-  --color-text-muted: #{map.get(pkt.$pkt-colors, "grays-gray-600")};
+  --color-text: #{map.get(pkt.$pkt-colors, "brand-dark-blue-1000")}; // #2a2859 - Punkt standard
+  --color-text-muted: #{map.get(pkt.$pkt-colors, "brand-dark-blue-700")}; // #6a698b - Punkt standard for sekundær tekst
   --color-background: #{map.get(pkt.$pkt-colors, "white")};
   --color-surface: #{map.get(pkt.$pkt-colors, "white")};
   --color-border: #{map.get(pkt.$pkt-colors, "grays-gray-200")};
