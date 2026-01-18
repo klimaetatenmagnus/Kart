@@ -60,7 +60,7 @@ export function Layout() {
             <img
               src="https://www.klimaoslo.no/wp-content/uploads/sites/2/2025/02/Oslo-logo-sort-RGB.png"
               alt="Oslo kommune"
-              height="64"
+              height="80"
             />
           </Link>
           <h1>KlimaOslo kartadmin</h1>
