@@ -109,9 +109,12 @@ stederRouter.post('/', async (req: StederRequest, res: Response) => {
         opprettetAv: req.user?.email || 'unknown',
       }
 
-      // Bare inkluder kategoriId hvis den er satt
-      if (stedInput.kategoriId) {
-        sted.kategoriId = stedInput.kategoriId
+      // Fler-kategori støtte: prioriter kategoriIder, fallback til kategoriId
+      if (stedInput.kategoriIder && stedInput.kategoriIder.length > 0) {
+        sted.kategoriIder = stedInput.kategoriIder
+      } else if (stedInput.kategoriId) {
+        // Bakoverkompatibilitet: konverter enkelt kategoriId til array
+        sted.kategoriIder = [stedInput.kategoriId]
       }
 
       // Cache bildet hvis stedet har bilder
@@ -138,7 +141,7 @@ stederRouter.post('/', async (req: StederRequest, res: Response) => {
   }
 })
 
-// Oppdater sted (f.eks. endre kategori)
+// Oppdater sted (f.eks. endre kategorier)
 stederRouter.put('/:stedId', async (req: StedIdRequest, res: Response) => {
   try {
     const { stedId } = req.params
@@ -148,21 +151,61 @@ stederRouter.put('/:stedId', async (req: StedIdRequest, res: Response) => {
       return res.status(404).json({ success: false, error: 'Sted ikke funnet' })
     }
 
-    const { kategoriId } = req.body
+    const { kategoriIder, kategoriId } = req.body
     const docRef = stederCollection.doc(stedId)
 
-    // Hvis kategoriId er null eller tom streng, fjern feltet
-    if (kategoriId === null || kategoriId === '') {
-      // Bruk FieldValue.delete() for å fjerne feltet fra Firestore
-      await docRef.update({ kategoriId: FieldValue.delete() })
+    // Fler-kategori støtte: prioriter kategoriIder, fallback til kategoriId
+    if (kategoriIder !== undefined) {
+      // Nytt format med kategoriIder array
+      if (Array.isArray(kategoriIder) && kategoriIder.length > 0) {
+        // Oppdater med kategoriIder og fjern gammelt kategoriId-felt
+        await docRef.update({
+          kategoriIder,
+          kategoriId: FieldValue.delete()
+        })
 
-      const updatedData = { ...doc.data() }
-      delete updatedData.kategoriId
-      res.json({ success: true, data: { id: stedId, ...updatedData } })
+        const updatedData = { ...doc.data(), kategoriIder } as Record<string, unknown>
+        delete updatedData.kategoriId
+        res.json({ success: true, data: { id: stedId, ...updatedData } })
+      } else {
+        // Tom array = fjern alle kategorier
+        await docRef.update({
+          kategoriIder: FieldValue.delete(),
+          kategoriId: FieldValue.delete()
+        })
+
+        const updatedData = { ...doc.data() }
+        delete updatedData.kategoriIder
+        delete updatedData.kategoriId
+        res.json({ success: true, data: { id: stedId, ...updatedData } })
+      }
+    } else if (kategoriId !== undefined) {
+      // Bakoverkompatibilitet: støtt gammelt format med kategoriId
+      if (kategoriId === null || kategoriId === '') {
+        // Fjern kategori
+        await docRef.update({
+          kategoriIder: FieldValue.delete(),
+          kategoriId: FieldValue.delete()
+        })
+
+        const updatedData = { ...doc.data() }
+        delete updatedData.kategoriIder
+        delete updatedData.kategoriId
+        res.json({ success: true, data: { id: stedId, ...updatedData } })
+      } else {
+        // Konverter til kategoriIder array
+        await docRef.update({
+          kategoriIder: [kategoriId],
+          kategoriId: FieldValue.delete()
+        })
+
+        const updatedData = { ...doc.data(), kategoriIder: [kategoriId] } as Record<string, unknown>
+        delete updatedData.kategoriId
+        res.json({ success: true, data: { id: stedId, ...updatedData } })
+      }
     } else {
-      // Oppdater med ny kategoriId
-      await docRef.update({ kategoriId })
-      res.json({ success: true, data: { id: stedId, ...doc.data(), kategoriId } })
+      // Ingen kategorier sendt - ingenting å oppdatere
+      res.json({ success: true, data: { id: stedId, ...doc.data() } })
     }
   } catch (err) {
     console.error('Error updating sted:', err)

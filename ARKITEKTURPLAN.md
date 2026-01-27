@@ -104,6 +104,14 @@ Målet er å bygge en selvhostet kartplattform på Google Cloud som:
 | 2026-01-13 | `useOpenNowStatus` hook opprettet for å håndtere henting og caching av åpen-status. | Fullført |
 | 2026-01-13 | Filtreringslogikk i App.tsx oppdatert til å faktisk filtrere basert på åpen-status. | Fullført |
 | 2026-01-14 | **Legend-komponent implementert** - Kategoriforklaring i nedre venstre hjørne av kartet med Punkt-styling. | Fullført |
+| 2026-01-21 | **Fler-kategori støtte implementert** - Steder kan nå tilhøre flere kategorier samtidig (maks 4). | Fullført |
+| 2026-01-21 | Type-definisjoner utvidet med `kategoriIder: string[]` (bakoverkompatibel med `kategoriId`). | Fullført |
+| 2026-01-21 | Hjelpefunksjoner `getStedKategorier()` og `getForsteKategoriId()` opprettet i shared utils. | Fullført |
+| 2026-01-21 | Backend PUT/POST oppdatert til å håndtere `kategoriIder` array. | Fullført |
+| 2026-01-21 | Widget filtrering: Sted vises hvis minst én av stedets kategorier er valgt. | Fullført |
+| 2026-01-21 | Widget marker-farge: Viser fargen til første valgte kategori (dynamisk basert på filter). | Fullført |
+| 2026-01-21 | Sidebar viser alle kategoriprikker for hvert sted (1-2: vertikal, 3-4: 2x2 grid). | Fullført |
+| 2026-01-21 | Admin kategori-velger endret fra dropdown til checkbox-liste for fler-valg. | Fullført |
 
 ---
 
@@ -736,7 +744,8 @@ Brukere kan søke etter områder/nabolag i tillegg til stedsnavn. Når de velger
   id: "auto-generated-id",
   kartinstansId: "badstuer",               // Referanse til kartinstans
   placeId: "ChIJXwZ...",                   // Google Places ID
-  kategoriId: "sjobadstu",                 // Referanse til kategori
+  kategoriIder: ["sjobadstu", "badstu"],   // Referanser til kategorier (maks 4)
+  // kategoriId: "sjobadstu",              // DEPRECATED - bakoverkompatibilitet
 
   // Cache av Google Places-data (oppdateres hver 30. dag)
   cachedData: {
@@ -815,9 +824,9 @@ DELETE /api/kartinstanser/:slug        # Slett
 ##### Steder
 ```
 GET    /api/kartinstanser/:slug/steder           # Liste steder
-POST   /api/kartinstanser/:slug/steder           # Legg til sted(er)
+POST   /api/kartinstanser/:slug/steder           # Legg til sted(er) med kategoriIder[]
 DELETE /api/kartinstanser/:slug/steder/:id       # Fjern sted
-PUT    /api/kartinstanser/:slug/steder/:id       # Oppdater kategori
+PUT    /api/kartinstanser/:slug/steder/:id       # Oppdater kategorier (kategoriIder[])
 ```
 
 ##### Google Places (proxy)

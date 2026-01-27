@@ -1,7 +1,5 @@
 import type { StedDTO, Kategori, PlaceDetails } from '@klimaoslo-kart/shared'
-
-// Punkt designsystem mørkeblå farge - brukes for steder uten kategori
-const PUNKT_DARK_BLUE = '#2A2859'
+import { getStedKategorier, getForsteKategoriId } from '@klimaoslo-kart/shared'
 
 interface SidebarProps {
   steder: StedDTO[]
@@ -21,9 +19,12 @@ function formatAddress(address: string): string {
 export function Sidebar({ steder, kategorier, onStedClick, selectedStedId }: SidebarProps) {
   // Sorter steder etter kategori og deretter navn
   // Steder uten kategori sorteres sist
+  // Bruker første kategori for sortering (fler-kategori støtte)
   const sortedSteder = [...steder].sort((a, b) => {
-    const catA = a.kategoriId ? kategorier.findIndex((k) => k.id === a.kategoriId) : 999
-    const catB = b.kategoriId ? kategorier.findIndex((k) => k.id === b.kategoriId) : 999
+    const catIdA = getForsteKategoriId(a)
+    const catIdB = getForsteKategoriId(b)
+    const catA = catIdA ? kategorier.findIndex((k) => k.id === catIdA) : 999
+    const catB = catIdB ? kategorier.findIndex((k) => k.id === catIdB) : 999
     if (catA !== catB) return catA - catB
     return a.cachedData.navn.localeCompare(b.cachedData.navn)
   })
@@ -32,21 +33,29 @@ export function Sidebar({ steder, kategorier, onStedClick, selectedStedId }: Sid
     <div className="sidebar">
       <ul className="store-list">
         {sortedSteder.map((sted) => {
-          const kategori = sted.kategoriId
-            ? kategorier.find((k) => k.id === sted.kategoriId)
-            : null
-          // Bruk kategori-farge hvis den finnes, ellers mørkeblå fra Punkt
-          const dotColor = kategori?.farge || PUNKT_DARK_BLUE
+          // Hent alle kategorier for stedet (maks 4)
+          const stedKategorier = getStedKategorier(sted).slice(0, 4)
+          const harFlereKategorier = stedKategorier.length > 2
+
           return (
             <li
               key={sted.id}
-              className={`store-item ${selectedStedId === sted.id ? 'selected' : ''}`}
+              className={`store-item ${selectedStedId === sted.id ? 'selected' : ''} ${harFlereKategorier ? 'multi-category' : ''}`}
               onClick={() => onStedClick(sted)}
             >
-              <span
-                className="category-dot"
-                style={{ backgroundColor: dotColor }}
-              />
+              <div className={`category-dots ${harFlereKategorier ? 'grid-2x2' : ''}`}>
+                {stedKategorier.map((katId) => {
+                  const kategori = kategorier.find((k) => k.id === katId)
+                  return kategori ? (
+                    <span
+                      key={katId}
+                      className="category-dot"
+                      style={{ backgroundColor: kategori.farge }}
+                      title={kategori.navn}
+                    />
+                  ) : null
+                })}
+              </div>
               <div className="store-info">
                 <span className="pkt-txt-16-medium">{sted.cachedData.navn}</span>
                 <span className="pkt-txt-14">{formatAddress(sted.cachedData.adresse)}</span>

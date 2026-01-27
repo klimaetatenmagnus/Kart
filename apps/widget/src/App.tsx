@@ -10,6 +10,7 @@ import { useKartinstans } from './hooks/useKartinstans'
 import { useSteder } from './hooks/useSteder'
 import { useOpenNowStatus } from './hooks/useOpenNowStatus'
 import type { StedDTO, PlaceDetails } from '@klimaoslo-kart/shared'
+import { getStedKategorier } from '@klimaoslo-kart/shared'
 
 // Parse URL-parametre for embed-innstillinger
 function useEmbedOptions() {
@@ -66,12 +67,14 @@ function App() {
   // Filtrer steder basert på kategorier og åpen nå-filter
   const filteredSteder = useMemo(() => {
     return steder.filter((sted) => {
-      // Kategorifiltrering
+      // Kategorifiltrering - støtter fler-kategori
       if (kartinstans?.kategorier && kartinstans.kategorier.length > 0) {
-        if (!sted.kategoriId) {
+        const stedKategorier = getStedKategorier(sted)
+        if (stedKategorier.length === 0) {
           return false
         }
-        if (!selectedCategories.has(sted.kategoriId)) {
+        // Vis stedet hvis minst én av stedets kategorier er valgt i filteret
+        if (!stedKategorier.some(katId => selectedCategories.has(katId))) {
           return false
         }
       }
@@ -260,6 +263,7 @@ function App() {
             ref={mapRef}
             kartinstans={kartinstans}
             steder={filteredSteder}
+            selectedCategories={selectedCategories}
             onStedSelect={handleStedSelect}
             onStedDeselect={handleCloseDetails}
             selectedStedId={selectedSted?.id}

@@ -339,16 +339,39 @@ body {
   border-bottom: 1px solid #{map.get(pkt.$pkt-colors, "brand-neutrals-200")};
   cursor: pointer;
 
-  .category-dot {
-    margin-top: 6px; // Midtstill med første tekstlinje (pkt-txt-16-medium)
-  }
-
   &:hover {
     background: #{map.get(pkt.$pkt-colors, "brand-neutrals-200")};
+
+    .category-dot {
+      transform: scale(1.15);
+    }
   }
 
   &.selected {
     background: #{map.get(pkt.$pkt-colors, "brand-blue-300")};
+  }
+}
+
+// Container for kategoriprikker - støtter 1-4 prikker
+.category-dots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-top: 4px; // Midtstill med første tekstlinje
+
+  .category-dot {
+    width: 12px;
+    height: 12px;
+  }
+
+  // 2x2 grid for 3-4 kategorier
+  &.grid-2x2 {
+    display: grid;
+    grid-template-columns: repeat(2, 12px);
+    grid-template-rows: repeat(2, 12px);
+    gap: 3px;
+    margin-top: 2px;
   }
 }
 

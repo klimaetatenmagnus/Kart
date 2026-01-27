@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { PktButton, PktTextinput, PktSelect, PktCheckbox, PktAlert, PktIcon } from '@oslokommune/punkt-react'
 import type { KartinstansDTO, KartinstansInput, Kategori, PlaceSearchResult, StedDTO } from '@klimaoslo-kart/shared'
+import { getStedKategorier, getForsteKategoriId } from '@klimaoslo-kart/shared'
 import { apiFetch } from '../services/api'
 
 // Hjelpefunksjon for dyp sammenligning av objekter
@@ -68,7 +69,7 @@ const getTextColorForBackground = (bgColor: string): string => {
 }
 
 interface PlaceWithCategory extends PlaceSearchResult {
-  selectedKategoriId?: string;
+  selectedKategoriIder: string[];
 }
 
 interface EmbedOptions {
@@ -105,6 +106,10 @@ export function KartinstansEditor() {
 
   // Pending places for new kartinstans (stored locally until saved)
   const [pendingPlaces, setPendingPlaces] = useState<PlaceWithCategory[]>([])
+
+  // State for å tracke åpne kategori-dropdowns i søkeresultater og pending places
+  const [openCategoryDropdownId, setOpenCategoryDropdownId] = useState<string | null>(null)
+  const searchCategoryDropdownRef = useRef<HTMLDivElement>(null)
 
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([])
@@ -205,10 +210,14 @@ export function KartinstansEditor() {
       if (!currStedIds.has(s.id)) changeCount++
     })
 
-    // Modified steder (category changes)
+    // Modified steder (category changes) - sammenlign kategoriIder arrays
     existingSteder.forEach(curr => {
       const orig = originalSteder.find(s => s.id === curr.id)
-      if (orig && orig.kategoriId !== curr.kategoriId) changeCount++
+      if (orig) {
+        const origKategorier = getStedKategorier(orig)
+        const currKategorier = getStedKategorier(curr)
+        if (!deepEqual(origKategorier, currKategorier)) changeCount++
+      }
     })
 
     return { count: changeCount, hasChanges: changeCount > 0 }
@@ -259,7 +268,7 @@ export function KartinstansEditor() {
 
       const resultsWithCategory = (data.data || []).map((place: PlaceSearchResult) => ({
         ...place,
-        selectedKategoriId: '', // Standard: ingen kategori
+        selectedKategoriIder: [] as string[], // Standard: ingen kategorier
       }))
 
       setSearchResults(resultsWithCategory)
@@ -323,6 +332,9 @@ export function KartinstansEditor() {
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
         setEditingCategoryStedId(null)
       }
+      if (searchCategoryDropdownRef.current && !searchCategoryDropdownRef.current.contains(event.target as Node)) {
+        setOpenCategoryDropdownId(null)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
@@ -349,7 +361,7 @@ export function KartinstansEditor() {
           lat: data.data.lat,
           lng: data.data.lng,
           rating: data.data.rating,
-          selectedKategoriId: '', // Standard: ingen kategori
+          selectedKategoriIder: [], // Standard: ingen kategorier
         }
         setSearchResults([place])
       }
@@ -361,13 +373,19 @@ export function KartinstansEditor() {
     }
   }
 
-  const updateSearchResultCategory = (placeId: string, kategoriId: string) => {
+  // Toggle en kategori for et søkeresultat
+  const toggleSearchResultCategory = (placeId: string, kategoriId: string) => {
     setSearchResults(prev =>
-      prev.map(place =>
-        place.placeId === placeId
-          ? { ...place, selectedKategoriId: kategoriId }
-          : place
-      )
+      prev.map(place => {
+        if (place.placeId !== placeId) return place
+        const isSelected = place.selectedKategoriIder.includes(kategoriId)
+        return {
+          ...place,
+          selectedKategoriIder: isSelected
+            ? place.selectedKategoriIder.filter(id => id !== kategoriId)
+            : [...place.selectedKategoriIder, kategoriId]
+        }
+      })
     )
   }
 
@@ -389,12 +407,12 @@ export function KartinstansEditor() {
 
     setAddingPlace(place.placeId)
     try {
-      const body: { placeId: string; kategoriId?: string } = {
+      const body: { placeId: string; kategoriIder?: string[] } = {
         placeId: place.placeId,
       }
-      // Bare inkluder kategoriId hvis den er satt
-      if (place.selectedKategoriId) {
-        body.kategoriId = place.selectedKategoriId
+      // Bare inkluder kategoriIder hvis det er valgte kategorier
+      if (place.selectedKategoriIder.length > 0) {
+        body.kategoriIder = place.selectedKategoriIder
       }
 
       const response = await apiFetch(`/api/kartinstanser/${slug}/steder`, {
@@ -420,14 +438,19 @@ export function KartinstansEditor() {
     setPendingPlaces(prev => prev.filter(p => p.placeId !== placeId))
   }
 
-  // Update category for a pending place
-  const updatePendingPlaceCategory = (placeId: string, kategoriId: string) => {
+  // Toggle en kategori for et pending place
+  const togglePendingPlaceCategory = (placeId: string, kategoriId: string) => {
     setPendingPlaces(prev =>
-      prev.map(place =>
-        place.placeId === placeId
-          ? { ...place, selectedKategoriId: kategoriId }
-          : place
-      )
+      prev.map(place => {
+        if (place.placeId !== placeId) return place
+        const isSelected = place.selectedKategoriIder.includes(kategoriId)
+        return {
+          ...place,
+          selectedKategoriIder: isSelected
+            ? place.selectedKategoriIder.filter(id => id !== kategoriId)
+            : [...place.selectedKategoriIder, kategoriId]
+        }
+      })
     )
   }
 
@@ -450,7 +473,8 @@ export function KartinstansEditor() {
     }
   }
 
-  const updateStedCategory = async (stedId: string, newKategoriId: string) => {
+  // Oppdater kategorier for et sted (fler-kategori støtte)
+  const updateStedKategorier = async (stedId: string, newKategoriIder: string[]) => {
     if (!slug) return
 
     setUpdatingCategory(stedId)
@@ -458,26 +482,40 @@ export function KartinstansEditor() {
       const response = await apiFetch(`/api/kartinstanser/${slug}/steder/${stedId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kategoriId: newKategoriId || null }), // null for å fjerne kategori
+        body: JSON.stringify({ kategoriIder: newKategoriIder }),
       })
 
-      if (!response.ok) throw new Error('Kunne ikke oppdatere kategori')
+      if (!response.ok) throw new Error('Kunne ikke oppdatere kategorier')
 
       // Oppdater lokal state
       setExistingSteder(prev =>
         prev.map(sted =>
           sted.id === stedId
-            ? { ...sted, kategoriId: newKategoriId || undefined }
+            ? { ...sted, kategoriIder: newKategoriIder.length > 0 ? newKategoriIder : undefined, kategoriId: undefined }
             : sted
         )
       )
       setEditingCategoryStedId(null)
     } catch (err) {
-      console.error('Error updating category:', err)
-      setError('Kunne ikke oppdatere kategori')
+      console.error('Error updating kategorier:', err)
+      setError('Kunne ikke oppdatere kategorier')
     } finally {
       setUpdatingCategory(null)
     }
+  }
+
+  // Toggle en kategori for et eksisterende sted
+  const toggleStedCategory = (stedId: string, kategoriId: string) => {
+    const sted = existingSteder.find(s => s.id === stedId)
+    if (!sted) return
+
+    const currentKategorier = getStedKategorier(sted)
+    const isSelected = currentKategorier.includes(kategoriId)
+    const newKategorier = isSelected
+      ? currentKategorier.filter(id => id !== kategoriId)
+      : [...currentKategorier, kategoriId]
+
+    updateStedKategorier(stedId, newKategorier)
   }
 
   const getKategoriById = (kategoriId: string) => {
@@ -607,11 +645,11 @@ export function KartinstansEditor() {
         // Add all pending places to the new kartinstans
         for (const place of pendingPlaces) {
           try {
-            const body: { placeId: string; kategoriId?: string } = {
+            const body: { placeId: string; kategoriIder?: string[] } = {
               placeId: place.placeId,
             }
-            if (place.selectedKategoriId) {
-              body.kategoriId = place.selectedKategoriId
+            if (place.selectedKategoriIder.length > 0) {
+              body.kategoriIder = place.selectedKategoriIder
             }
 
             await apiFetch(`/api/kartinstanser/${newSlug}/steder`, {
@@ -866,6 +904,7 @@ export function KartinstansEditor() {
                 <div className="search-results-list">
                   {searchResults.map((place) => {
                     const alreadyAdded = isPlaceAlreadyAdded(place.placeId)
+                    const isDropdownOpen = openCategoryDropdownId === `search-${place.placeId}`
                     return (
                       <div key={place.placeId} className={`search-result-item ${alreadyAdded ? 'already-added' : ''}`}>
                         <div className="result-info">
@@ -877,21 +916,69 @@ export function KartinstansEditor() {
                         ) : (
                           <div className="result-actions">
                             {formData.kategorier.length > 0 && (
-                              <div className="pkt-sr-only-label-wrapper">
-                                <PktSelect
-                                  label="Velg kategori"
-                                  id={`kategori-${place.placeId}`}
-                                  name={`kategori-${place.placeId}`}
-                                  value={place.selectedKategoriId || ''}
-                                  onChange={(e) => updateSearchResultCategory(place.placeId, e.target.value)}
+                              <div
+                                className="kategori-checkbox-dropdown"
+                                ref={isDropdownOpen ? searchCategoryDropdownRef : null}
+                              >
+                                <button
+                                  type="button"
+                                  className="kategori-checkbox-toggle"
+                                  onClick={() => setOpenCategoryDropdownId(
+                                    isDropdownOpen ? null : `search-${place.placeId}`
+                                  )}
                                 >
-                                  <option value="">Ingen kategori</option>
-                                  {formData.kategorier.map((kat) => (
-                                    <option key={kat.id} value={kat.id}>
-                                      {kat.navn}
-                                    </option>
-                                  ))}
-                                </PktSelect>
+                                  {place.selectedKategoriIder.length === 0 ? (
+                                    <span className="kategori-toggle-text">Velg kategorier</span>
+                                  ) : (
+                                    <span className="kategori-toggle-dots">
+                                      {place.selectedKategoriIder.slice(0, 3).map(katId => {
+                                        const kat = formData.kategorier.find(k => k.id === katId)
+                                        return kat ? (
+                                          <span
+                                            key={katId}
+                                            className="kategori-dot"
+                                            style={{ backgroundColor: kat.farge }}
+                                            title={kat.navn}
+                                          />
+                                        ) : null
+                                      })}
+                                      {place.selectedKategoriIder.length > 3 && (
+                                        <span className="kategori-more">+{place.selectedKategoriIder.length - 3}</span>
+                                      )}
+                                    </span>
+                                  )}
+                                  <svg
+                                    className="kategori-chevron"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </button>
+                                {isDropdownOpen && (
+                                  <div className="kategori-checkbox-list">
+                                    {formData.kategorier.map((kat) => (
+                                      <label key={kat.id} className="kategori-checkbox-item">
+                                        <PktCheckbox
+                                          id={`search-kat-${place.placeId}-${kat.id}`}
+                                          checked={place.selectedKategoriIder.includes(kat.id)}
+                                          onChange={() => toggleSearchResultCategory(place.placeId, kat.id)}
+                                        />
+                                        <span
+                                          className="kategori-dropdown-color"
+                                          style={{ backgroundColor: kat.farge }}
+                                        />
+                                        <span className="kategori-checkbox-name">{kat.navn}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             )}
                             <PktButton
@@ -919,13 +1006,15 @@ export function KartinstansEditor() {
                   <thead>
                     <tr>
                       <th>Navn</th>
-                      {formData.kategorier.length > 0 && <th>Kategori</th>}
+                      {formData.kategorier.length > 0 && <th>Kategorier</th>}
                       <th>Handlinger</th>
                     </tr>
                   </thead>
                   <tbody>
                     {existingSteder.map((sted) => {
-                      const kategori = sted.kategoriId ? getKategoriById(sted.kategoriId) : null
+                      const stedKategorier = getStedKategorier(sted)
+                      const forsteKategoriId = getForsteKategoriId(sted)
+                      const forsteKategori = forsteKategoriId ? getKategoriById(forsteKategoriId) : null
                       return (
                         <tr key={sted.id}>
                           <td>
@@ -946,15 +1035,21 @@ export function KartinstansEditor() {
                                   )}
                                   disabled={updatingCategory === sted.id}
                                   style={{
-                                    backgroundColor: kategori?.farge || '#e0e0e0',
-                                    color: kategori ? getTextColorForBackground(kategori.farge) : '#333'
+                                    backgroundColor: forsteKategori?.farge || '#e0e0e0',
+                                    color: forsteKategori ? getTextColorForBackground(forsteKategori.farge) : '#333'
                                   }}
                                 >
                                   {updatingCategory === sted.id ? (
                                     'Oppdaterer...'
                                   ) : (
                                     <>
-                                      {kategori?.navn || 'Ingen kategori'}
+                                      {stedKategorier.length === 0 ? (
+                                        'Ingen kategorier'
+                                      ) : stedKategorier.length === 1 ? (
+                                        forsteKategori?.navn || 'Ukjent'
+                                      ) : (
+                                        `${forsteKategori?.navn || 'Ukjent'} +${stedKategorier.length - 1}`
+                                      )}
                                       <svg
                                         className="kategori-chevron"
                                         xmlns="http://www.w3.org/2000/svg"
@@ -972,71 +1067,21 @@ export function KartinstansEditor() {
                                   )}
                                 </button>
                                 {editingCategoryStedId === sted.id && (
-                                  <div className="kategori-dropdown">
-                                    <button
-                                      type="button"
-                                      className={`kategori-dropdown-item ${!sted.kategoriId ? 'active' : ''}`}
-                                      onClick={() => {
-                                        if (sted.kategoriId) {
-                                          updateStedCategory(sted.id, '')
-                                        } else {
-                                          setEditingCategoryStedId(null)
-                                        }
-                                      }}
-                                    >
-                                      <span
-                                        className="kategori-dropdown-color"
-                                        style={{ backgroundColor: '#e0e0e0' }}
-                                      />
-                                      Ingen kategori
-                                      {!sted.kategoriId && (
-                                        <svg
-                                          className="kategori-check"
-                                          xmlns="http://www.w3.org/2000/svg"
-                                          viewBox="0 0 20 20"
-                                          fill="currentColor"
-                                        >
-                                          <path
-                                            fillRule="evenodd"
-                                            d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-                                            clipRule="evenodd"
-                                          />
-                                        </svg>
-                                      )}
-                                    </button>
+                                  <div className="kategori-checkbox-list kategori-dropdown">
                                     {formData.kategorier.map((kat) => (
-                                      <button
-                                        key={kat.id}
-                                        type="button"
-                                        className={`kategori-dropdown-item ${kat.id === sted.kategoriId ? 'active' : ''}`}
-                                        onClick={() => {
-                                          if (kat.id !== sted.kategoriId) {
-                                            updateStedCategory(sted.id, kat.id)
-                                          } else {
-                                            setEditingCategoryStedId(null)
-                                          }
-                                        }}
-                                      >
+                                      <label key={kat.id} className="kategori-checkbox-item">
+                                        <PktCheckbox
+                                          id={`sted-kat-${sted.id}-${kat.id}`}
+                                          checked={stedKategorier.includes(kat.id)}
+                                          onChange={() => toggleStedCategory(sted.id, kat.id)}
+                                          disabled={updatingCategory === sted.id}
+                                        />
                                         <span
                                           className="kategori-dropdown-color"
                                           style={{ backgroundColor: kat.farge }}
                                         />
-                                        {kat.navn}
-                                        {kat.id === sted.kategoriId && (
-                                          <svg
-                                            className="kategori-check"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 20 20"
-                                            fill="currentColor"
-                                          >
-                                            <path
-                                              fillRule="evenodd"
-                                              d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-                                              clipRule="evenodd"
-                                            />
-                                          </svg>
-                                        )}
-                                      </button>
+                                        <span className="kategori-checkbox-name">{kat.navn}</span>
+                                      </label>
                                     ))}
                                   </div>
                                 )}
@@ -1069,12 +1114,13 @@ export function KartinstansEditor() {
                     <thead>
                       <tr>
                         <th>Navn</th>
-                        {formData.kategorier.length > 0 && <th>Kategori</th>}
+                        {formData.kategorier.length > 0 && <th>Kategorier</th>}
                         <th>Handlinger</th>
                       </tr>
                     </thead>
                     <tbody>
                       {pendingPlaces.map((place) => {
+                        const isDropdownOpen = openCategoryDropdownId === `pending-${place.placeId}`
                         return (
                           <tr key={place.placeId}>
                             <td>
@@ -1083,21 +1129,69 @@ export function KartinstansEditor() {
                             </td>
                             {formData.kategorier.length > 0 && (
                               <td>
-                                <div className="pkt-sr-only-label-wrapper">
-                                  <PktSelect
-                                    label="Velg kategori"
-                                    id={`pending-kategori-${place.placeId}`}
-                                    name={`pending-kategori-${place.placeId}`}
-                                    value={place.selectedKategoriId || ''}
-                                    onChange={(e) => updatePendingPlaceCategory(place.placeId, e.target.value)}
+                                <div
+                                  className="kategori-checkbox-dropdown"
+                                  ref={isDropdownOpen ? searchCategoryDropdownRef : null}
+                                >
+                                  <button
+                                    type="button"
+                                    className="kategori-checkbox-toggle"
+                                    onClick={() => setOpenCategoryDropdownId(
+                                      isDropdownOpen ? null : `pending-${place.placeId}`
+                                    )}
                                   >
-                                    <option value="">Ingen kategori</option>
-                                    {formData.kategorier.map((kat) => (
-                                      <option key={kat.id} value={kat.id}>
-                                        {kat.navn}
-                                      </option>
-                                    ))}
-                                  </PktSelect>
+                                    {place.selectedKategoriIder.length === 0 ? (
+                                      <span className="kategori-toggle-text">Velg kategorier</span>
+                                    ) : (
+                                      <span className="kategori-toggle-dots">
+                                        {place.selectedKategoriIder.slice(0, 3).map(katId => {
+                                          const kat = formData.kategorier.find(k => k.id === katId)
+                                          return kat ? (
+                                            <span
+                                              key={katId}
+                                              className="kategori-dot"
+                                              style={{ backgroundColor: kat.farge }}
+                                              title={kat.navn}
+                                            />
+                                          ) : null
+                                        })}
+                                        {place.selectedKategoriIder.length > 3 && (
+                                          <span className="kategori-more">+{place.selectedKategoriIder.length - 3}</span>
+                                        )}
+                                      </span>
+                                    )}
+                                    <svg
+                                      className="kategori-chevron"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 20 20"
+                                      fill="currentColor"
+                                      aria-hidden="true"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                                        clipRule="evenodd"
+                                      />
+                                    </svg>
+                                  </button>
+                                  {isDropdownOpen && (
+                                    <div className="kategori-checkbox-list">
+                                      {formData.kategorier.map((kat) => (
+                                        <label key={kat.id} className="kategori-checkbox-item">
+                                          <PktCheckbox
+                                            id={`pending-kat-${place.placeId}-${kat.id}`}
+                                            checked={place.selectedKategoriIder.includes(kat.id)}
+                                            onChange={() => togglePendingPlaceCategory(place.placeId, kat.id)}
+                                          />
+                                          <span
+                                            className="kategori-dropdown-color"
+                                            style={{ backgroundColor: kat.farge }}
+                                          />
+                                          <span className="kategori-checkbox-name">{kat.navn}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                             )}

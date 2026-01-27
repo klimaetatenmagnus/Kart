@@ -5,6 +5,7 @@ import { PktCheckbox } from '@oslokommune/punkt-react'
 import { InfoWindowContent } from './InfoWindowContent'
 import { Legend } from './Legend'
 import type { KartinstansDTO, StedDTO, PlaceDetails } from '@klimaoslo-kart/shared'
+import { getStedKategorier } from '@klimaoslo-kart/shared'
 
 // Punkt designsystem mørkeblå farge - brukes for steder uten kategori
 const PUNKT_DARK_BLUE = '#2A2859'
@@ -21,6 +22,7 @@ export interface MapViewHandle {
 interface MapViewProps {
   kartinstans: KartinstansDTO
   steder: StedDTO[]
+  selectedCategories: Set<string>
   onStedSelect: (sted: StedDTO, placeDetails?: PlaceDetails) => void
   onStedDeselect?: () => void
   selectedStedId?: string
@@ -33,6 +35,7 @@ interface MapViewProps {
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView({
   kartinstans,
   steder,
+  selectedCategories,
   onStedSelect,
   onStedDeselect,
   selectedStedId: _selectedStedId, // For fremtidig bruk (markere valgt sted)
@@ -123,8 +126,12 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
     // Opprett nye markorer
     steder.forEach((sted) => {
-      const kategori = sted.kategoriId
-        ? kartinstans.kategorier.find((k) => k.id === sted.kategoriId)
+      // Finn første kategori som er både tildelt stedet OG valgt i filteret
+      // Dette sikrer at fargen matcher den synlige kategorien
+      const stedKategorier = getStedKategorier(sted)
+      const forsteValgtKategoriId = stedKategorier.find(katId => selectedCategories.has(katId))
+      const kategori = forsteValgtKategoriId
+        ? kartinstans.kategorier.find((k) => k.id === forsteValgtKategoriId)
         : null
 
       // Bruk kategori-farge hvis den finnes, ellers mørkeblå fra Punkt
@@ -218,7 +225,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
       markersRef.current.set(sted.id, marker)
     })
-  }, [map, placesService, steder, kartinstans.kategorier, onStedSelect])
+  }, [map, placesService, steder, kartinstans.kategorier, selectedCategories, onStedSelect])
 
   return (
     <div className="map-container">

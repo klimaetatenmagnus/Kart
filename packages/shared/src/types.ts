@@ -92,7 +92,8 @@ export interface Sted {
   id: string;
   kartinstansId: string;
   placeId: string; // Google Places ID
-  kategoriId?: string; // Valgfri - steder vises uten kategori hvis ikke satt
+  kategoriId?: string; // Bakoverkompatibilitet - bruk kategoriIder for nye steder
+  kategoriIder?: string[]; // Fler-kategori støtte - steder kan tilhøre flere kategorier
   cachedData: CachedPlaceData;
   bildeCache?: BildeCache; // Bildecache-data fra Cloud Storage
   opprettet: Date;
@@ -103,7 +104,8 @@ export interface StedDTO {
   id: string;
   kartinstansId: string;
   placeId: string;
-  kategoriId?: string; // Valgfri - steder vises uten kategori hvis ikke satt
+  kategoriId?: string; // Bakoverkompatibilitet - bruk kategoriIder for nye steder
+  kategoriIder?: string[]; // Fler-kategori støtte - steder kan tilhøre flere kategorier
   cachedData: {
     navn: string;
     adresse: string;
@@ -119,7 +121,8 @@ export interface StedDTO {
 
 export interface StedInput {
   placeId: string;
-  kategoriId?: string; // Valgfri - kan legge til steder uten kategori
+  kategoriId?: string; // Bakoverkompatibilitet - bruk kategoriIder for nye steder
+  kategoriIder?: string[]; // Fler-kategori støtte - steder kan tilhøre flere kategorier
 }
 
 // ============================================

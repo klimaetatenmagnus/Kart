@@ -793,6 +793,100 @@ body {
   color: var(--color-success);
 }
 
+/* Checkbox-basert kategori-dropdown for fler-kategori støtte */
+.kategori-checkbox-dropdown {
+  position: relative;
+}
+
+.kategori-checkbox-toggle {
+  @include get-text("pkt-txt-14");
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pkt-spacing-8);
+  padding: var(--pkt-spacing-8) var(--pkt-spacing-12);
+  background-color: #ffffff;
+  border: 2px solid var(--color-border);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  min-width: 150px;
+
+  &:hover {
+    border-color: var(--color-primary);
+  }
+
+  &:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+.kategori-toggle-text {
+  color: var(--color-text-muted);
+}
+
+.kategori-toggle-dots {
+  display: flex;
+  align-items: center;
+  gap: var(--pkt-spacing-4);
+}
+
+.kategori-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kategori-more {
+  @include get-text("pkt-txt-12-medium");
+  color: var(--color-text-muted);
+}
+
+.kategori-checkbox-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: var(--pkt-spacing-4);
+  min-width: 200px;
+  background-color: #ffffff;
+  border: 2px solid var(--color-primary);
+  box-shadow: #{map.get(pkt.$box-shadow, "medium")};
+  z-index: 9999;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.kategori-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: var(--pkt-spacing-8);
+  padding: var(--pkt-spacing-8) var(--pkt-spacing-16);
+  cursor: pointer;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  // Juster checkbox-margin
+  .pkt-form-checkbox {
+    margin: 0;
+  }
+
+  .pkt-form-checkbox input {
+    margin: 0;
+  }
+}
+
+.kategori-checkbox-name {
+  @include get-text("pkt-txt-14");
+  color: var(--color-text);
+}
+
 /* Embed-kode seksjon */
 .embed-section {
   background-color: var(--color-surface);
