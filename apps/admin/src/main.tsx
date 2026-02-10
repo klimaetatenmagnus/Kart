@@ -20,8 +20,12 @@ if (skipAuth) {
   // Produksjon: bruk MSAL
   import('@azure/msal-react').then(({ MsalProvider }) => {
     import('@azure/msal-browser').then(({ PublicClientApplication }) => {
-      import('./services/authConfig').then(({ msalConfig }) => {
+      Promise.all([
+        import('./services/authConfig'),
+        import('./services/api'),
+      ]).then(([{ msalConfig }, { setMsalInstance }]) => {
         const msalInstance = new PublicClientApplication(msalConfig)
+        setMsalInstance(msalInstance)
         createRoot(document.getElementById('root')!).render(
           <StrictMode>
             <MsalProvider instance={msalInstance}>

@@ -43,7 +43,7 @@ jobs:
         run: |
           docker build \
             -f apps/widget/Dockerfile \
-            --build-arg VITE_API_URL=https://klimaoslo-kart-api-412468299057.europe-west1.run.app \
+            --build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
             --build-arg VITE_GOOGLE_MAPS_API_KEY=${{ secrets.MAPS_API_KEY }} \
             -t ${{ env.REGISTRY }}/widget:${{ github.sha }} \
             -t ${{ env.REGISTRY }}/widget:latest \
