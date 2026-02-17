@@ -11,6 +11,10 @@ import { Configuration, LogLevel } from '@azure/msal-browser'
 const AZURE_CLIENT_ID = import.meta.env.VITE_AZURE_CLIENT_ID || 'your-client-id'
 const AZURE_TENANT_ID = import.meta.env.VITE_AZURE_TENANT_ID || 'your-tenant-id'
 const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI || 'http://localhost:3000'
+const AZURE_API_SCOPE =
+  import.meta.env.VITE_AZURE_API_SCOPE || `api://${AZURE_CLIENT_ID}/access_as_user`
+
+export const apiScope = AZURE_API_SCOPE
 
 export const msalConfig: Configuration = {
   auth: {
@@ -43,7 +47,7 @@ export const msalConfig: Configuration = {
 }
 
 export const loginRequest = {
-  scopes: ['User.Read'],
+  scopes: [apiScope],
 }
 
 export const graphConfig = {

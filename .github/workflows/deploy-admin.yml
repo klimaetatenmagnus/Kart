@@ -46,6 +46,7 @@ jobs:
             --build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
             --build-arg VITE_AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }} \
             --build-arg VITE_AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
+            --build-arg VITE_AZURE_API_SCOPE=${{ secrets.AZURE_API_SCOPE }} \
             --build-arg VITE_REDIRECT_URI=https://admin.kart.klimaoslo.no/auth/callback \
             -t ${{ env.REGISTRY }}/admin:${{ github.sha }} \
             -t ${{ env.REGISTRY }}/admin:latest \

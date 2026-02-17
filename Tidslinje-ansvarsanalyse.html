@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8">
+<title>Tidslinje og ansvarsanalyse – Places API kostnadsøkning</title>
+<style>
+  body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.5; }
+  h2 { margin-top: 32px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #c0c0c0; padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background-color: #f0f0f0; font-weight: 600; }
+  tr:nth-child(even) { background-color: #fafafa; }
+  .highlight { background-color: #fff3cd; }
+  .cost-row { background-color: #f8d7da; font-weight: 600; }
+  strong { font-weight: 600; }
+  .conclusion { background: #f0f4ff; border-left: 4px solid #2563eb; padding: 16px 20px; margin: 24px 0; }
+  .facts { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 16px 20px; margin: 24px 0; }
+  ul { margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<h2>Tidslinje og ansvarsanalyse – Places API kostnadsøkning</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:140px">Dato</th>
+      <th>Hendelse</th>
+      <th style="width:120px">Ansvar</th>
+      <th style="width:100px">Kostnad</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Før jan 2026</td>
+      <td>Kartene fungerer normalt med server-side cache (~6t TTL)</td>
+      <td>Dinamo</td>
+      <td>~$18/dag</td>
+    </tr>
+    <tr>
+      <td>13. jan</td>
+      <td>Ny kartplattform deployet, referrer-restriksjoner satt på API-nøkkel</td>
+      <td>Magnus</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>14. jan</td>
+      <td>WordPress-kart brekker (API-nøkkeltype ukompatibel med REST API)</td>
+      <td>Konsekvens av Magnus' endring</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>14. jan</td>
+      <td>Restriksjoner fjernet, <strong>alt fungerer normalt igjen</strong></td>
+      <td>Magnus</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>15–27. jan</td>
+      <td><strong>Normal drift i 2 uker</strong> (~1 100 kall/dag, cache fungerer)</td>
+      <td>—</td>
+      <td>~$18/dag</td>
+    </tr>
+    <tr class="highlight">
+      <td>~28. jan</td>
+      <td>Cache-directory for kartvisning forsvinner/feiler → <strong>Fatal error</strong></td>
+      <td><strong>Dinamo (server-side)</strong></td>
+      <td>$0/dag</td>
+    </tr>
+    <tr class="highlight">
+      <td>29. jan – 3. feb</td>
+      <td>Kartene viser «Fatal error» i <strong>6 dager</strong>, ingen hos Dinamo reagerer</td>
+      <td><strong>Dinamo</strong></td>
+      <td>$0/dag</td>
+    </tr>
+    <tr>
+      <td>4. feb 13:50</td>
+      <td>Nils (redaktør, Klimaetaten) oppdager feilen og melder fra til Dinamo</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr class="highlight">
+      <td>4. feb 14:55</td>
+      <td>Linda (Dinamo) fikser: <em>«feil i cachegenerering som manglet korrekt cachedirectory»</em></td>
+      <td><strong>Dinamo</strong></td>
+      <td>—</td>
+    </tr>
+    <tr class="highlight">
+      <td>5. feb →</td>
+      <td>Kartene fungerer, men <strong>caching fungerer ikke</strong> → 10x API-kall (~11 000/dag mot normalt ~1 100/dag)</td>
+      <td><strong>Dinamo</strong></td>
+      <td>~$180/dag</td>
+    </tr>
+    <tr>
+      <td>16. feb</td>
+      <td>Budget-varsel innført ($600/mnd med terskler ved 50%, 80%, 100% og 200%)</td>
+      <td>Magnus</td>
+      <td>—</td>
+    </tr>
+    <tr class="cost-row">
+      <td>Feb 1–15</td>
+      <td>Påløpt ekstrakostnad pga cache-feil</td>
+      <td>Dinamo</td>
+      <td>~$2 000</td>
+    </tr>
+    <tr class="cost-row">
+      <td>Feb 1–28</td>
+      <td>Prognose for hele februar (uten fix)</td>
+      <td></td>
+      <td>~$4 950</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="conclusion">
+<h3 style="margin-top:0">Konklusjon</h3>
+<p><strong>Ansvaret ligger hos Dinamo.</strong> Magnus' referrer-endring (14. jan) var fjernet samme dag og alt fungerte normalt i 2 uker etterpå. Cache-directory-feilen som oppstod ~28. januar er en server-konfigurasjonsfeil på Dinamos side som ikke har noe med Google API-nøkler å gjøre. Dinamo lot også en «Fatal error» stå i 6 dager uten å oppdage det, og fixen 4. februar gjenopprettet ikke caching-funksjonaliteten.</p>
+</div>
+
+<div class="facts">
+<h3 style="margin-top:0">Faktiske tall (fra GCP Billing)</h3>
+<ul>
+  <li>Normal månedskostnad (januar): <strong>$542</strong></li>
+  <li>Påløpt ekstrakostnad hittil (feb 1–15): <strong>~$2 000</strong></li>
+  <li>Prognose for hele februar uten fix: <strong>~$4 950</strong> (812% økning)</li>
+  <li>Budget-varsel er innført på <strong>$600/mnd</strong> for fremtidig beskyttelse</li>
+</ul>
+</div>
+
+</body>
+</html>

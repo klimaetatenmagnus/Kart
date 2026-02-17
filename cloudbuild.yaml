@@ -34,6 +34,8 @@ steps:
       - 'VITE_AZURE_CLIENT_ID=${_AZURE_CLIENT_ID}'
       - '--build-arg'
       - 'VITE_AZURE_TENANT_ID=${_AZURE_TENANT_ID}'
+      - '--build-arg'
+      - 'VITE_AZURE_API_SCOPE=${_AZURE_API_SCOPE}'
       - '-t'
       - '${_REGISTRY}/admin:$COMMIT_SHA'
       - '-t'
@@ -119,6 +121,7 @@ substitutions:
   _REGISTRY: europe-west1-docker.pkg.dev/bruktbutikk-navn/klimaoslo-kart
   _AZURE_CLIENT_ID: ''  # Settes i trigger
   _AZURE_TENANT_ID: ''  # Settes i trigger
+  _AZURE_API_SCOPE: ''  # Settes i trigger
   _MAPS_API_KEY: ''     # Settes i trigger
 
 options:

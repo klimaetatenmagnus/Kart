@@ -10,6 +10,22 @@ import { imagesRouter } from './routes/images.js'
 import { publicRouter } from './routes/public.js'
 import { authMiddleware } from './middleware/auth.js'
 
+if (process.env.NODE_ENV === 'production' && process.env.DEV_MODE === 'true') {
+  throw new Error('Ugyldig konfigurasjon: DEV_MODE=true er ikke tillatt i produksjon.')
+}
+
+if (process.env.NODE_ENV === 'production' && process.env.DEV_MODE !== 'true') {
+  const missingAuthConfig = ['AZURE_TENANT_ID', 'AZURE_CLIENT_ID'].filter(
+    (key) => !process.env[key]
+  )
+
+  if (missingAuthConfig.length > 0) {
+    throw new Error(
+      `Mangler nodvendig auth-konfigurasjon: ${missingAuthConfig.join(', ')}`
+    )
+  }
+}
+
 const app = express()
 const PORT = process.env.PORT || 8080
 

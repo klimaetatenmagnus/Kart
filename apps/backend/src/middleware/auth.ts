@@ -1,8 +1,23 @@
 import { Request, Response, NextFunction } from 'express'
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose'
 
 // Azure AD konfigurasjon - brukes kun i produksjon
 const AZURE_TENANT_ID = process.env.AZURE_TENANT_ID || ''
 const AZURE_CLIENT_ID = process.env.AZURE_CLIENT_ID || ''
+const AZURE_ISSUER =
+  process.env.AZURE_TOKEN_ISSUER ||
+  `https://login.microsoftonline.com/${AZURE_TENANT_ID}/v2.0`
+const AZURE_JWKS_URI =
+  process.env.AZURE_JWKS_URI ||
+  `https://login.microsoftonline.com/${AZURE_TENANT_ID}/discovery/v2.0/keys`
+const AZURE_AUDIENCES = (
+  process.env.AZURE_API_AUDIENCES || `${AZURE_CLIENT_ID},api://${AZURE_CLIENT_ID}`
+)
+  .split(',')
+  .map((audience) => audience.trim())
+  .filter(Boolean)
+
+const jwks = AZURE_TENANT_ID ? createRemoteJWKSet(new URL(AZURE_JWKS_URI)) : null
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -10,6 +25,34 @@ export interface AuthenticatedRequest extends Request {
     name: string
     oid: string
   }
+}
+
+function getStringClaim(payload: JWTPayload, claim: string): string | null {
+  const value = payload[claim]
+  return typeof value === 'string' ? value : null
+}
+
+async function verifyToken(token: string): Promise<JWTPayload> {
+  if (!jwks) {
+    throw new Error('Mangler AZURE_TENANT_ID/AZURE_JWKS_URI')
+  }
+
+  let lastError: unknown = null
+
+  for (const audience of AZURE_AUDIENCES) {
+    try {
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer: AZURE_ISSUER,
+        audience,
+        clockTolerance: '5s',
+      })
+      return payload
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError || new Error('Tokenverifisering feilet')
 }
 
 export async function authMiddleware(
@@ -27,8 +70,15 @@ export async function authMiddleware(
     return next()
   }
 
-  const authHeader = req.headers.authorization
+  if (!AZURE_TENANT_ID || AZURE_AUDIENCES.length === 0) {
+    console.error('Auth config error: mangler AZURE_TENANT_ID/AZURE_API_AUDIENCES')
+    return res.status(500).json({
+      success: false,
+      error: 'Serverkonfigurasjon for autentisering mangler',
+    })
+  }
 
+  const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({
       success: false,
@@ -39,38 +89,30 @@ export async function authMiddleware(
   const token = authHeader.substring(7)
 
   try {
-    // Valider token mot Azure AD
-    // I produksjon bor vi bruke jose eller passport-azure-ad for full validering
-    // Her er en forenklet versjon som dekoder token
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    const payload = await verifyToken(token)
 
-    // Sjekk at token er for riktig tenant og app
-    if (payload.tid !== AZURE_TENANT_ID) {
+    const tokenTenantId = getStringClaim(payload, 'tid')
+    if (tokenTenantId !== AZURE_TENANT_ID) {
       throw new Error('Ugyldig tenant')
     }
 
-    if (payload.aud !== AZURE_CLIENT_ID && payload.aud !== `api://${AZURE_CLIENT_ID}`) {
-      throw new Error('Ugyldig audience')
-    }
-
-    // Sjekk at token ikke er utlopt
-    if (payload.exp * 1000 < Date.now()) {
-      throw new Error('Token er utlopt')
-    }
+    const email =
+      getStringClaim(payload, 'preferred_username') ||
+      getStringClaim(payload, 'upn') ||
+      getStringClaim(payload, 'email')
 
     // Sjekk at bruker har oslo.kommune.no domene (inkl. subdomener som kli.oslo.kommune.no)
-    const email = payload.preferred_username || payload.upn || payload.email
-    if (!email?.endsWith('oslo.kommune.no')) {
+    if (!email || !email.toLowerCase().endsWith('oslo.kommune.no')) {
       throw new Error('Kun Oslo kommune-brukere har tilgang')
     }
 
     req.user = {
       email,
-      name: payload.name || email,
-      oid: payload.oid,
+      name: getStringClaim(payload, 'name') || email,
+      oid: getStringClaim(payload, 'oid') || email,
     }
 
-    next()
+    return next()
   } catch (err) {
     console.error('Auth error:', err)
     return res.status(401).json({

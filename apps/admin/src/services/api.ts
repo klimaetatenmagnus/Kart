@@ -3,30 +3,35 @@
  * Håndterer base URL og autentisering
  */
 
+import type { AccountInfo, IPublicClientApplication } from '@azure/msal-browser'
+import { apiScope } from './authConfig'
+
 const API_URL = import.meta.env.VITE_API_URL || ''
 const skipAuth = import.meta.env.VITE_SKIP_AUTH === 'true'
 
 // MSAL-instansen settes fra main.tsx når appen starter i produksjonsmodus
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let msalInstance: any = null
+let msalInstance: IPublicClientApplication | null = null
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function setMsalInstance(instance: any) {
+export function setMsalInstance(instance: IPublicClientApplication) {
   msalInstance = instance
+}
+
+function getActiveAccount(instance: IPublicClientApplication): AccountInfo | null {
+  return instance.getActiveAccount() || instance.getAllAccounts()[0] || null
 }
 
 async function getToken(): Promise<string | null> {
   if (skipAuth || !msalInstance) return null
 
-  const accounts = msalInstance.getAllAccounts()
-  if (accounts.length === 0) return null
+  const account = getActiveAccount(msalInstance)
+  if (!account) return null
 
   try {
     const response = await msalInstance.acquireTokenSilent({
-      scopes: ['User.Read'],
-      account: accounts[0],
+      scopes: [apiScope],
+      account,
     })
-    return response.idToken
+    return response.accessToken
   } catch (error) {
     console.error('Kunne ikke hente token:', error)
     return null

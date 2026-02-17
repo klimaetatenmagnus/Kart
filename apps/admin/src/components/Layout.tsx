@@ -1,15 +1,44 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useMsal } from '@azure/msal-react'
 import { PktButton } from '@oslokommune/punkt-react'
 import { apiFetch } from '../services/api'
 
 const skipAuth = import.meta.env.VITE_SKIP_AUTH === 'true'
 const devUserName = import.meta.env.VITE_DEV_USER_NAME || 'Developer'
 
+interface LayoutShellProps {
+  onLogout: () => void
+  showDevBadge?: boolean
+  userName: string
+}
+
 export function Layout() {
-  // I utviklingsmodus: vis dev-bruker
-  // I produksjon: hent fra MSAL
-  const userName = devUserName
+  if (skipAuth) {
+    return (
+      <LayoutShell
+        userName={devUserName}
+        showDevBadge
+        onLogout={() => window.location.reload()}
+      />
+    )
+  }
+
+  return <AuthenticatedLayout />
+}
+
+function AuthenticatedLayout() {
+  const { instance, accounts } = useMsal()
+  const userName = accounts[0]?.name || accounts[0]?.username || 'Innlogget bruker'
+
+  const handleLogout = () => {
+    void instance.logoutRedirect()
+  }
+
+  return <LayoutShell userName={userName} onLogout={handleLogout} />
+}
+
+function LayoutShell({ onLogout, showDevBadge = false, userName }: LayoutShellProps) {
   const [nyeTipsCount, setNyeTipsCount] = useState<number>(0)
   const location = useLocation()
   const navigate = useNavigate()
@@ -33,24 +62,8 @@ export function Layout() {
         // Ignorer feil - vis bare ikke tallet
       }
     }
-    fetchNyeTips()
+    void fetchNyeTips()
   }, [])
-
-  const handleLogout = () => {
-    if (skipAuth) {
-      // I development: bare refresh
-      window.location.reload()
-    } else {
-      // I produksjon: MSAL logout
-      try {
-        const { useMsal } = require('@azure/msal-react')
-        const { instance } = useMsal()
-        instance.logoutRedirect()
-      } catch {
-        window.location.reload()
-      }
-    }
-  }
 
   return (
     <div className="layout">
@@ -64,15 +77,11 @@ export function Layout() {
             />
           </Link>
           <h1>KlimaOslo kartadmin</h1>
-          {skipAuth && <span className="dev-badge">DEV</span>}
+          {showDevBadge && <span className="dev-badge">DEV</span>}
         </div>
         <div className="header-right">
           <span className="user-name">{userName}</span>
-          <PktButton
-            onClick={handleLogout}
-            skin="secondary"
-            size="small"
-          >
+          <PktButton onClick={onLogout} skin="secondary" size="small">
             Logg ut
           </PktButton>
         </div>

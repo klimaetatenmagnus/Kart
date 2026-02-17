@@ -85,8 +85,12 @@ Admin-appen kjører i dev-modus uten Azure AD-innlogging.
 | `GOOGLE_PLACES_API_KEY` | Backend API-nøkkel for Places API |
 | `VITE_GOOGLE_MAPS_API_KEY` | Frontend API-nøkkel for Maps JavaScript API |
 | `VITE_API_URL` | URL til backend API |
+| `AZURE_CLIENT_ID` | Backend app-ID/audience for tokenvalidering |
+| `AZURE_TENANT_ID` | Azure AD tenant-ID for backend tokenvalidering |
+| `AZURE_API_AUDIENCES` | Valgfri, komma-separert liste av gyldige audiences for backend |
 | `VITE_AZURE_CLIENT_ID` | Azure AD app-ID (produksjon) |
 | `VITE_AZURE_TENANT_ID` | Azure AD tenant-ID (produksjon) |
+| `VITE_AZURE_API_SCOPE` | API-scope admin ber om (default: `api://<VITE_AZURE_CLIENT_ID>/access_as_user`) |
 
 ## Deployment
 
