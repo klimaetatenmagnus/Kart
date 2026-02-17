@@ -26,6 +26,11 @@ if (skipAuth) {
   ]).then(async ([{ MsalProvider }, { PublicClientApplication }, { msalConfig }, { setMsalInstance }]) => {
     const msalInstance = new PublicClientApplication(msalConfig)
     await msalInstance.initialize()
+    // Prosesser redirect-respons FØR React rendres
+    const response = await msalInstance.handleRedirectPromise()
+    if (response) {
+      console.log('MSAL: Innlogging vellykket for', response.account?.username)
+    }
     setMsalInstance(msalInstance)
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
