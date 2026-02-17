@@ -58,9 +58,9 @@ export async function authMiddleware(
       throw new Error('Token er utlopt')
     }
 
-    // Sjekk at bruker har @oslo.kommune.no domene
+    // Sjekk at bruker har oslo.kommune.no domene (inkl. subdomener som kli.oslo.kommune.no)
     const email = payload.preferred_username || payload.upn || payload.email
-    if (!email?.endsWith('@oslo.kommune.no')) {
+    if (!email?.endsWith('oslo.kommune.no')) {
       throw new Error('Kun Oslo kommune-brukere har tilgang')
     }
 
