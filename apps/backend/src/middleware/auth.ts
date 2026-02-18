@@ -16,6 +16,10 @@ const AZURE_AUDIENCES = (
   .split(',')
   .map((audience) => audience.trim())
   .filter(Boolean)
+const AZURE_ALLOWED_GROUP_IDS = (process.env.AZURE_ALLOWED_GROUP_IDS || '')
+  .split(',')
+  .map((groupId) => groupId.trim())
+  .filter(Boolean)
 
 const jwks = AZURE_TENANT_ID ? createRemoteJWKSet(new URL(AZURE_JWKS_URI)) : null
 
@@ -30,6 +34,22 @@ export interface AuthenticatedRequest extends Request {
 function getStringClaim(payload: JWTPayload, claim: string): string | null {
   const value = payload[claim]
   return typeof value === 'string' ? value : null
+}
+
+function getStringArrayClaim(payload: JWTPayload, claim: string): string[] {
+  const value = payload[claim]
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
+function isGroupOverageToken(payload: JWTPayload): boolean {
+  const hasGroups = payload['hasgroups']
+  if (hasGroups === true) return true
+
+  const claimNames = payload['_claim_names']
+  if (!claimNames || typeof claimNames !== 'object') return false
+  const groupsPointer = (claimNames as Record<string, unknown>)['groups']
+  return typeof groupsPointer === 'string' && groupsPointer.length > 0
 }
 
 async function verifyToken(token: string): Promise<JWTPayload> {
@@ -104,6 +124,57 @@ export async function authMiddleware(
     // Sjekk at bruker har oslo.kommune.no domene (inkl. subdomener som kli.oslo.kommune.no)
     if (!email || !email.toLowerCase().endsWith('oslo.kommune.no')) {
       throw new Error('Kun Oslo kommune-brukere har tilgang')
+    }
+
+    if (AZURE_ALLOWED_GROUP_IDS.length > 0) {
+      const tokenOid = getStringClaim(payload, 'oid') || 'unknown-oid'
+      const tokenRoles = getStringArrayClaim(payload, 'roles')
+
+      if (isGroupOverageToken(payload)) {
+        console.warn('Auth forbidden: group overage token', {
+          oid: tokenOid,
+          email,
+          roles: tokenRoles,
+          allowedGroupIds: AZURE_ALLOWED_GROUP_IDS,
+        })
+        return res.status(403).json({
+          success: false,
+          error:
+            'Token inneholder ikke gruppeliste (group overage). Bruk app-roller eller Graph-oppslag.',
+        })
+      }
+
+      const tokenGroups = getStringArrayClaim(payload, 'groups')
+      if (tokenGroups.length === 0) {
+        console.warn('Auth forbidden: no groups claim in token', {
+          oid: tokenOid,
+          email,
+          roles: tokenRoles,
+          allowedGroupIds: AZURE_ALLOWED_GROUP_IDS,
+        })
+        return res.status(403).json({
+          success: false,
+          error:
+            'Ingen grupper funnet i token. Sjekk Entra Token Configuration for group claims.',
+        })
+      }
+
+      const isAuthorized = tokenGroups.some((groupId) =>
+        AZURE_ALLOWED_GROUP_IDS.includes(groupId)
+      )
+      if (!isAuthorized) {
+        console.warn('Auth forbidden: user not in allowed groups', {
+          oid: tokenOid,
+          email,
+          tokenGroups,
+          roles: tokenRoles,
+          allowedGroupIds: AZURE_ALLOWED_GROUP_IDS,
+        })
+        return res.status(403).json({
+          success: false,
+          error: 'Brukeren mangler nødvendig tilgangsgruppe',
+        })
+      }
     }
 
     req.user = {

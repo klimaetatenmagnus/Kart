@@ -4,7 +4,7 @@
  */
 
 import type { AccountInfo, IPublicClientApplication } from '@azure/msal-browser'
-import { apiScope } from './authConfig'
+import { apiScope, usesCustomApiScope } from './authConfig'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 const skipAuth = import.meta.env.VITE_SKIP_AUTH === 'true'
@@ -31,7 +31,14 @@ async function getToken(): Promise<string | null> {
       scopes: [apiScope],
       account,
     })
-    return response.accessToken
+
+    // Kompatibilitetsmodus: uten eksponert API-scope i Entra bruker vi idToken.
+    // Når API-scope er konfigurert (api://...), brukes accessToken.
+    if (usesCustomApiScope) {
+      return response.accessToken || null
+    }
+
+    return response.idToken || response.accessToken || null
   } catch (error) {
     console.error('Kunne ikke hente token:', error)
     return null

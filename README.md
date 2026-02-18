@@ -88,9 +88,10 @@ Admin-appen kjører i dev-modus uten Azure AD-innlogging.
 | `AZURE_CLIENT_ID` | Backend app-ID/audience for tokenvalidering |
 | `AZURE_TENANT_ID` | Azure AD tenant-ID for backend tokenvalidering |
 | `AZURE_API_AUDIENCES` | Valgfri, komma-separert liste av gyldige audiences for backend |
+| `AZURE_ALLOWED_GROUP_IDS` | Valgfri, komma-separert liste av Entra gruppe-IDer med skrivetilgang |
 | `VITE_AZURE_CLIENT_ID` | Azure AD app-ID (produksjon) |
 | `VITE_AZURE_TENANT_ID` | Azure AD tenant-ID (produksjon) |
-| `VITE_AZURE_API_SCOPE` | API-scope admin ber om (default: `api://<VITE_AZURE_CLIENT_ID>/access_as_user`) |
+| `VITE_AZURE_API_SCOPE` | API-scope admin ber om (default: `User.Read`). Ved custom API må dette være fullt scope, f.eks. `api://<app-id>/access_as_user` (ikke bare `api://<app-id>`) |
 
 ## Deployment
 
