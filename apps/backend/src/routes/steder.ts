@@ -29,7 +29,7 @@ async function fetchPlaceDetails(placeId: string): Promise<{
   adresse: string;
   lat: number;
   lng: number;
-  rating?: number;
+  rating: number | null;
   photoReference?: string;
 }> {
   try {
@@ -44,12 +44,12 @@ async function fetchPlaceDetails(placeId: string): Promise<{
       adresse: place?.formatted_address || '',
       lat: place?.geometry?.location?.lat || 0,
       lng: place?.geometry?.location?.lng || 0,
-      rating: place?.rating,
+      rating: place?.rating ?? null,
       photoReference: place?.photos?.[0]?.photo_reference,
     }
   } catch (err) {
     console.error('Error fetching place details:', err)
-    return { navn: '', adresse: '', lat: 0, lng: 0 }
+    return { navn: '', adresse: '', lat: 0, lng: 0, rating: null }
   }
 }
 
