@@ -44,3 +44,5 @@ apps/**/node_modules/.vite/
 # Markdown-filer (unntatt README)
 *.md
 !README.md
+epost-embed-oppsett.html
+embed-forslag.html
