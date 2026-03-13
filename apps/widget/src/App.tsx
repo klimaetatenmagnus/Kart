@@ -290,6 +290,7 @@ function App() {
       {isMobile && selectedSted && selectedPlaceDetails && (
         <BottomSheet
           placeDetails={selectedPlaceDetails}
+          bildeCache={selectedSted.bildeCache}
           onClose={handleCloseDetails}
         />
       )}

@@ -1,12 +1,15 @@
 import { PktButton, PktIcon } from '@oslokommune/punkt-react'
-import type { PlaceDetails } from '@klimaoslo-kart/shared'
+import type { PlaceDetails, BildeCacheDTO } from '@klimaoslo-kart/shared'
 
 interface BottomSheetProps {
   placeDetails: PlaceDetails
+  bildeCache?: BildeCacheDTO
   onClose: () => void
 }
 
-export function BottomSheet({ placeDetails, onClose }: BottomSheetProps) {
+export function BottomSheet({ placeDetails, bildeCache, onClose }: BottomSheetProps) {
+  const bildeUrl = bildeCache?.url
+
   return (
     <div className="bottom-sheet show">
       <PktButton
@@ -21,11 +24,12 @@ export function BottomSheet({ placeDetails, onClose }: BottomSheetProps) {
       <div className="bottom-sheet-content">
         <h3 className="pkt-txt-18-medium">{placeDetails.navn}</h3>
 
-        {placeDetails.bilder?.[0] && (
+        {bildeUrl && (
           <img
-            src={placeDetails.bilder[0]}
+            src={bildeUrl}
             alt={placeDetails.navn}
             className="place-image"
+            loading="lazy"
           />
         )}
 

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { kartinstanserCollection, stederCollection, tipsCollection } from '../services/firestore.js'
+import { ApiCache } from '../services/apiCache.js'
 import type { TipsInput } from '@klimaoslo-kart/shared'
 
 export const publicRouter = Router()
@@ -29,6 +30,18 @@ const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || ''
 const OSLO_CENTER_LAT = 59.9139
 const OSLO_CENTER_LNG = 10.7522
 const OSLO_SEARCH_RADIUS = 15000 // 15 km dekker det meste av Oslo
+
+// Server-side cacher for å redusere Google API-kall og kostnader
+// Place Details: 30 minutter (statiske data som adresse, telefon osv.)
+const placeDetailsCache = new ApiCache<Record<string, unknown>>(30 * 60)
+// Åpen nå-status: 3 minutter (endres sjeldnere enn hvert 3. minutt)
+const openNowCache = new ApiCache<boolean | null>(3 * 60)
+
+// Rydd opp utløpte cache-oppføringer hvert 10. minutt
+setInterval(() => {
+  placeDetailsCache.cleanup()
+  openNowCache.cleanup()
+}, 10 * 60 * 1000)
 
 // Hent kartinstans (offentlig)
 publicRouter.get('/kartinstanser/:slug', async (req, res) => {
@@ -118,8 +131,16 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Mangler placeId-parameter' })
     }
 
+    const placeIdStr = String(placeId)
+
+    // Sjekk cache først
+    const cached = placeDetailsCache.get(placeIdStr)
+    if (cached) {
+      return res.json({ success: true, data: cached })
+    }
+
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,opening_hours,formatted_phone_number,website,photos,rating,url&key=${GOOGLE_PLACES_API_KEY}`
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeIdStr}&fields=name,formatted_address,geometry,opening_hours,formatted_phone_number,website,rating,url&key=${GOOGLE_PLACES_API_KEY}`
     )
 
     const data = await response.json()
@@ -129,13 +150,8 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Sted ikke funnet' })
     }
 
-    // Generer bilde-URL hvis stedet har bilder
-    const bilder = place.photos?.map((photo: { photo_reference: string }) =>
-      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photo.photo_reference}&key=${GOOGLE_PLACES_API_KEY}`
-    )
-
-    const result = {
-      placeId,
+    const result: Record<string, unknown> = {
+      placeId: placeIdStr,
       navn: place.name,
       adresse: place.formatted_address,
       lat: place.geometry?.location?.lat,
@@ -146,8 +162,10 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
       apningstider: place.opening_hours?.weekday_text,
       apenNa: place.opening_hours?.open_now,
       googleMapsUrl: place.url,
-      bilder,
     }
+
+    // Cache resultatet (uten bilder - de ligger allerede i Cloud Storage)
+    placeDetailsCache.set(placeIdStr, result)
 
     res.json({ success: true, data: result })
   } catch (err) {
@@ -180,29 +198,44 @@ publicRouter.get('/places/open-now-batch', placesRateLimiter, async (req, res) =
       })
     }
 
-    // Hent åpen/lukket-status for alle steder parallelt
-    const results = await Promise.all(
-      ids.map(async (placeId) => {
-        try {
-          const response = await fetch(
-            `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=opening_hours&key=${GOOGLE_PLACES_API_KEY}`
-          )
-          const data = await response.json()
-
-          // open_now er beregnet av Google basert på nåværende tidspunkt
-          const isOpen = data.result?.opening_hours?.open_now ?? null
-          return { placeId, isOpen }
-        } catch {
-          // Returnerer null hvis vi ikke får svar, så stedet vises uansett
-          return { placeId, isOpen: null }
-        }
-      })
-    )
-
-    // Bygg et map fra placeId til åpen-status
+    // Sjekk cache og finn hvilke som trenger fersk data
     const statusMap: Record<string, boolean | null> = {}
-    for (const result of results) {
-      statusMap[result.placeId] = result.isOpen
+    const uncachedIds: string[] = []
+
+    for (const id of ids) {
+      const cached = openNowCache.get(id)
+      if (cached !== null) {
+        statusMap[id] = cached
+      } else {
+        uncachedIds.push(id)
+      }
+    }
+
+    // Hent åpen/lukket-status kun for steder som ikke er cachet
+    if (uncachedIds.length > 0) {
+      const results = await Promise.all(
+        uncachedIds.map(async (placeId) => {
+          try {
+            const response = await fetch(
+              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=opening_hours&key=${GOOGLE_PLACES_API_KEY}`
+            )
+            const data = await response.json()
+
+            // open_now er beregnet av Google basert på nåværende tidspunkt
+            const isOpen = data.result?.opening_hours?.open_now ?? null
+            // Cache resultatet
+            openNowCache.set(placeId, isOpen)
+            return { placeId, isOpen }
+          } catch {
+            // Returnerer null hvis vi ikke får svar, så stedet vises uansett
+            return { placeId, isOpen: null }
+          }
+        })
+      )
+
+      for (const result of results) {
+        statusMap[result.placeId] = result.isOpen
+      }
     }
 
     res.json({ success: true, data: statusMap })
