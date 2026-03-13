@@ -15,7 +15,7 @@ export function Legend({ kategorier }: LegendProps) {
   }
 
   return (
-    <div className="map-legend" role="region" aria-label="Kartlegende">
+    <div className="map-legend" role="region" aria-label="Kartlegende" lang="nb">
       <h4 className="map-legend__title pkt-txt-14-medium">Kategorier</h4>
       <ul className="map-legend__list">
         {kategorier.map((kategori) => (
