@@ -209,6 +209,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
               apningstider: place.apningstider,
               apenNa: place.apenNa,
               googleMapsUrl: place.googleMapsUrl || cachedDetails.googleMapsUrl,
+              bilder: place.bilder,
             }
 
             // Oppdater med fullstendig data

@@ -36,11 +36,14 @@ const OSLO_SEARCH_RADIUS = 15000 // 15 km dekker det meste av Oslo
 const placeDetailsCache = new ApiCache<Record<string, unknown>>(30 * 60)
 // Åpen nå-status: 3 minutter (endres sjeldnere enn hvert 3. minutt)
 const openNowCache = new ApiCache<boolean | null>(3 * 60)
+// Foto-cache: 24 timer (bilder endres sjelden)
+const photoCache = new ApiCache<{ buffer: Buffer; contentType: string }>(24 * 60 * 60)
 
 // Rydd opp utløpte cache-oppføringer hvert 10. minutt
 setInterval(() => {
   placeDetailsCache.cleanup()
   openNowCache.cleanup()
+  photoCache.cleanup()
 }, 10 * 60 * 1000)
 
 // Hent kartinstans (offentlig)
@@ -140,7 +143,7 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
     }
 
     const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeIdStr}&fields=name,formatted_address,geometry,opening_hours,formatted_phone_number,website,rating,url&key=${GOOGLE_PLACES_API_KEY}`
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeIdStr}&fields=name,formatted_address,geometry,opening_hours,formatted_phone_number,website,photos,rating,url&key=${GOOGLE_PLACES_API_KEY}`
     )
 
     const data = await response.json()
@@ -149,6 +152,11 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
     if (!place) {
       return res.status(404).json({ success: false, error: 'Sted ikke funnet' })
     }
+
+    // Generer proxy-URLer for bilder (skjuler API-nøkkelen fra klienten)
+    const bilder = place.photos?.map((photo: { photo_reference: string }) =>
+      `/api/public/places/photo?ref=${encodeURIComponent(photo.photo_reference)}&maxwidth=400`
+    )
 
     const result: Record<string, unknown> = {
       placeId: placeIdStr,
@@ -162,9 +170,10 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
       apningstider: place.opening_hours?.weekday_text,
       apenNa: place.opening_hours?.open_now,
       googleMapsUrl: place.url,
+      bilder,
     }
 
-    // Cache resultatet (uten bilder - de ligger allerede i Cloud Storage)
+    // Cache resultatet
     placeDetailsCache.set(placeIdStr, result)
 
     res.json({ success: true, data: result })
@@ -242,6 +251,50 @@ publicRouter.get('/places/open-now-batch', placesRateLimiter, async (req, res) =
   } catch (err) {
     console.error('Error fetching open-now batch:', err)
     res.status(500).json({ success: false, error: 'Kunne ikke hente åpningsstatus' })
+  }
+})
+
+// Foto-proxy: serverer Google Places-bilder uten å eksponere API-nøkkelen
+// Cacher bilder i minne (24 timer) + browser-cache (7 dager) for å minimere API-kall
+publicRouter.get('/places/photo', placesRateLimiter, async (req, res) => {
+  try {
+    const { ref, maxwidth } = req.query
+
+    if (!ref || typeof ref !== 'string') {
+      return res.status(400).json({ success: false, error: 'Mangler ref-parameter' })
+    }
+
+    const width = Number(maxwidth) || 400
+    const cacheKey = `${ref}_${width}`
+
+    // Sjekk server-side cache først
+    const cached = photoCache.get(cacheKey)
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=604800')
+      res.set('Content-Type', cached.contentType)
+      return res.send(cached.buffer)
+    }
+
+    const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${width}&photo_reference=${encodeURIComponent(ref)}&key=${GOOGLE_PLACES_API_KEY}`
+    const response = await fetch(photoUrl)
+
+    if (!response.ok) {
+      return res.status(502).json({ success: false, error: 'Kunne ikke hente bilde' })
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer())
+    const contentType = response.headers.get('content-type') || 'image/jpeg'
+
+    // Cache i minne i 24 timer
+    photoCache.set(cacheKey, { buffer, contentType })
+
+    // Sett cache-headers slik at browseren cacher bildet i 7 dager
+    res.set('Cache-Control', 'public, max-age=604800')
+    res.set('Content-Type', contentType)
+    res.send(buffer)
+  } catch (err) {
+    console.error('Error proxying photo:', err)
+    res.status(500).json({ success: false, error: 'Kunne ikke hente bilde' })
   }
 })
 

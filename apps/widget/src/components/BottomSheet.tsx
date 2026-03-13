@@ -8,7 +8,8 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ placeDetails, bildeCache, onClose }: BottomSheetProps) {
-  const bildeUrl = bildeCache?.url
+  // Bruk cachet bilde fra Cloud Storage, eller fallback til backend-proxy
+  const bildeUrl = bildeCache?.url || placeDetails.bilder?.[0]
 
   return (
     <div className="bottom-sheet show">

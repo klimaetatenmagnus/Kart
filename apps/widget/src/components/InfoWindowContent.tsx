@@ -7,8 +7,8 @@ interface InfoWindowContentProps {
 }
 
 export function InfoWindowContent({ placeDetails, bildeCache }: InfoWindowContentProps) {
-  // Bruk cachet bilde fra Cloud Storage
-  const bildeUrl = bildeCache?.url
+  // Bruk cachet bilde fra Cloud Storage, eller fallback til backend-proxy
+  const bildeUrl = bildeCache?.url || placeDetails.bilder?.[0]
 
   return (
     <article className="pkt-info-window">
