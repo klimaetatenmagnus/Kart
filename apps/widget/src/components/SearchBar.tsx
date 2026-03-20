@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { PktIcon } from '@oslokommune/punkt-react'
 import { trackSearch } from '../utils/analytics'
+
 import type { StedDTO } from '@klimaoslo-kart/shared'
 
 // Søkeikon SVG (fra Punkt ikonbibliotek)
@@ -158,11 +159,11 @@ export function SearchBar({ value, onChange, steder, onAreaSelect, onPlaceSelect
     if (suggestion.type === 'area') {
       onChange(suggestion.mainText)
       onAreaSelect(suggestion.placeId, suggestion.description)
-      trackSearch(suggestion.mainText, 'område', kartSlug)
+      trackSearch(kartSlug)
     } else {
       onChange(suggestion.sted.cachedData.navn)
       onPlaceSelect(suggestion.sted)
-      trackSearch(suggestion.sted.cachedData.navn, 'sted', kartSlug)
+      trackSearch(kartSlug)
     }
     setIsOpen(false)
   }

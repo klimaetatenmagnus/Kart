@@ -34,11 +34,16 @@ function push(args: unknown[]): void {
 }
 
 /** Spor søk i kartets søkefelt */
-export function trackSearch(term: string, type: 'sted' | 'område', kartSlug: string): void {
-  push(['trackEvent', 'Kart', 'Søk', `${type}: ${term}`, kartSlug])
+export function trackSearch(kartSlug: string): void {
+  push(['trackEvent', 'Kart', 'Søk', kartSlug])
 }
 
-/** Spor klikk på en oppføring (sidebar eller markør) */
-export function trackClick(stedNavn: string, source: 'sidebar' | 'markør', kartSlug: string): void {
-  push(['trackEvent', 'Kart', 'Klikk', `${source}: ${stedNavn}`, kartSlug])
+/** Spor klikk på markør i kartet */
+export function trackMarkerClick(kartSlug: string): void {
+  push(['trackEvent', 'Kart', 'Klikk markør', kartSlug])
+}
+
+/** Spor klikk på oppføring i sidepanelet */
+export function trackSidebarClick(kartSlug: string): void {
+  push(['trackEvent', 'Kart', 'Klikk sidebar', kartSlug])
 }

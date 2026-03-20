@@ -1,4 +1,4 @@
-import { trackClick } from '../utils/analytics'
+import { trackSidebarClick } from '../utils/analytics'
 import type { StedDTO, Kategori, PlaceDetails } from '@klimaoslo-kart/shared'
 import { getStedKategorier, getForsteKategoriId } from '@klimaoslo-kart/shared'
 
@@ -44,7 +44,7 @@ export function Sidebar({ steder, kategorier, onStedClick, selectedStedId, kartS
               key={sted.id}
               className={`store-item ${selectedStedId === sted.id ? 'selected' : ''} ${harFlereKategorier ? 'multi-category' : ''}`}
               onClick={() => {
-                trackClick(sted.cachedData.navn, 'sidebar', kartSlug)
+                trackSidebarClick(kartSlug)
                 onStedClick(sted)
               }}
             >

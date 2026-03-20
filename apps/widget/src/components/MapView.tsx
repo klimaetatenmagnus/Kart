@@ -4,7 +4,7 @@ import { Loader } from '@googlemaps/js-api-loader'
 import { PktCheckbox } from '@oslokommune/punkt-react'
 import { InfoWindowContent } from './InfoWindowContent'
 import { Legend } from './Legend'
-import { trackClick } from '../utils/analytics'
+import { trackMarkerClick } from '../utils/analytics'
 import type { KartinstansDTO, StedDTO, PlaceDetails } from '@klimaoslo-kart/shared'
 import { getStedKategorier } from '@klimaoslo-kart/shared'
 
@@ -155,7 +155,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       })
 
       marker.addListener('click', async () => {
-        trackClick(sted.cachedData.navn, 'markør', kartSlug)
+        trackMarkerClick(kartSlug)
 
         // Vis InfoWindow med cached data umiddelbart
         const showInfoWindow = (placeDetails: PlaceDetails) => {
