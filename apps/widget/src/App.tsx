@@ -221,6 +221,7 @@ function App() {
               onAreaSelect={handleAreaSelect}
               onPlaceSelect={handlePlaceSelectFromSearch}
               mapReady={mapReady}
+              kartSlug={slug}
             />
           )}
           {!embedOptions.skjulKategorifilter && kartinstans.kategorier.length > 0 && (
@@ -254,6 +255,7 @@ function App() {
               kategorier={kartinstans.kategorier}
               onStedClick={handleSidebarStedClick}
               selectedStedId={selectedSted?.id}
+              kartSlug={slug}
             />
           </div>
         )}
@@ -271,6 +273,7 @@ function App() {
             onOpenNowChange={handleOpenNowChange}
             openNowLoading={openNowLoading}
             onMapReady={handleMapReady}
+            kartSlug={slug}
           />
           <PktButton
             className="tips-button"

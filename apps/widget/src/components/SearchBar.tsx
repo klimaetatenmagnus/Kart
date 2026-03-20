@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { PktIcon } from '@oslokommune/punkt-react'
+import { trackSearch } from '../utils/analytics'
 import type { StedDTO } from '@klimaoslo-kart/shared'
 
 // Søkeikon SVG (fra Punkt ikonbibliotek)
@@ -45,6 +46,7 @@ interface SearchBarProps {
   onAreaSelect: (placeId: string, description: string) => void
   onPlaceSelect: (sted: StedDTO) => void
   mapReady: boolean
+  kartSlug: string
 }
 
 // Oslo bounding box for å begrense søk
@@ -55,7 +57,7 @@ const OSLO_BOUNDS = {
   west: 10.58,
 }
 
-export function SearchBar({ value, onChange, steder, onAreaSelect, onPlaceSelect, mapReady }: SearchBarProps) {
+export function SearchBar({ value, onChange, steder, onAreaSelect, onPlaceSelect, mapReady, kartSlug }: SearchBarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [areaSuggestions, setAreaSuggestions] = useState<AreaSuggestion[]>([])
   const [isLoadingAreas, setIsLoadingAreas] = useState(false)
@@ -156,9 +158,11 @@ export function SearchBar({ value, onChange, steder, onAreaSelect, onPlaceSelect
     if (suggestion.type === 'area') {
       onChange(suggestion.mainText)
       onAreaSelect(suggestion.placeId, suggestion.description)
+      trackSearch(suggestion.mainText, 'område', kartSlug)
     } else {
       onChange(suggestion.sted.cachedData.navn)
       onPlaceSelect(suggestion.sted)
+      trackSearch(suggestion.sted.cachedData.navn, 'sted', kartSlug)
     }
     setIsOpen(false)
   }

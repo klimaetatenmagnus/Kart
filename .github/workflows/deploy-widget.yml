@@ -45,6 +45,7 @@ jobs:
             -f apps/widget/Dockerfile \
             --build-arg VITE_API_URL=https://api.kart.klimaoslo.no \
             --build-arg VITE_GOOGLE_MAPS_API_KEY=${{ secrets.MAPS_API_KEY }} \
+            --build-arg VITE_PIWIK_PRO_SITE_ID=c20acb86-827e-4385-8a80-929af080c387 \
             -t ${{ env.REGISTRY }}/widget:${{ github.sha }} \
             -t ${{ env.REGISTRY }}/widget:latest \
             .

@@ -1,7 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { initAnalytics } from './utils/analytics'
 import './styles/main.scss'
+
+// Initialiser Piwik Pro analytics
+initAnalytics()
 
 // Rapporter høyde til parent-vindu for auto-resize ved embed
 if (window.parent !== window) {

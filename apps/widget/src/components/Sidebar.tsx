@@ -1,3 +1,4 @@
+import { trackClick } from '../utils/analytics'
 import type { StedDTO, Kategori, PlaceDetails } from '@klimaoslo-kart/shared'
 import { getStedKategorier, getForsteKategoriId } from '@klimaoslo-kart/shared'
 
@@ -6,6 +7,7 @@ interface SidebarProps {
   kategorier: Kategori[]
   onStedClick: (sted: StedDTO, placeDetails?: PlaceDetails) => void
   selectedStedId?: string
+  kartSlug: string
 }
 
 // Fjern "Norway" fra adresser for renere visning
@@ -16,7 +18,7 @@ function formatAddress(address: string): string {
     .trim()
 }
 
-export function Sidebar({ steder, kategorier, onStedClick, selectedStedId }: SidebarProps) {
+export function Sidebar({ steder, kategorier, onStedClick, selectedStedId, kartSlug }: SidebarProps) {
   // Sorter steder etter kategori og deretter navn
   // Steder uten kategori sorteres sist
   // Bruker første kategori for sortering (fler-kategori støtte)
@@ -41,7 +43,10 @@ export function Sidebar({ steder, kategorier, onStedClick, selectedStedId }: Sid
             <li
               key={sted.id}
               className={`store-item ${selectedStedId === sted.id ? 'selected' : ''} ${harFlereKategorier ? 'multi-category' : ''}`}
-              onClick={() => onStedClick(sted)}
+              onClick={() => {
+                trackClick(sted.cachedData.navn, 'sidebar', kartSlug)
+                onStedClick(sted)
+              }}
             >
               <div className={`category-dots ${harFlereKategorier ? 'grid-2x2' : ''}`}>
                 {stedKategorier.map((katId) => {

@@ -4,6 +4,7 @@ import { Loader } from '@googlemaps/js-api-loader'
 import { PktCheckbox } from '@oslokommune/punkt-react'
 import { InfoWindowContent } from './InfoWindowContent'
 import { Legend } from './Legend'
+import { trackClick } from '../utils/analytics'
 import type { KartinstansDTO, StedDTO, PlaceDetails } from '@klimaoslo-kart/shared'
 import { getStedKategorier } from '@klimaoslo-kart/shared'
 
@@ -30,6 +31,7 @@ interface MapViewProps {
   onOpenNowChange: (value: boolean) => void
   openNowLoading?: boolean
   onMapReady?: () => void
+  kartSlug: string
 }
 
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView({
@@ -43,6 +45,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   onOpenNowChange,
   openNowLoading = false,
   onMapReady,
+  kartSlug,
 }, ref) {
   const mapRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<google.maps.Map | null>(null)
@@ -152,6 +155,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       })
 
       marker.addListener('click', async () => {
+        trackClick(sted.cachedData.navn, 'markør', kartSlug)
+
         // Vis InfoWindow med cached data umiddelbart
         const showInfoWindow = (placeDetails: PlaceDetails) => {
           if (window.innerWidth >= 600 && infoWindowRef.current) {
