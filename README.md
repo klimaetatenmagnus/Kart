@@ -13,6 +13,7 @@ Kartplattformen lar redaksjonen opprette interaktive kart med steder hentet fra 
 - **Google Places-integrasjon** - Automatisk henting av åpningstider, bilder og kontaktinfo
 - **Tips fra brukere** - Publikum kan foreslå nye steder via skjema i kartet
 - **Bildecaching** - Bilder caches i Cloud Storage for å minimere API-kostnader
+- **Stedsdata-caching** - Åpningstider, kontaktinfo og detaljer lagres i Firestore og oppdateres i bakgrunnen (stale-while-revalidate). «Åpen nå» beregnes lokalt fra lagrede åpningstider, så kartvisning gjør ingen Google Places-kall i normal drift, uansett trafikk. Kjør `npm run migrate:details` én gang for å fylle inn detaljer for eksisterende steder.
 
 ## Arkitektur
 

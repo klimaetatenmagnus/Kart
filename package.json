@@ -17,7 +17,8 @@
     "build": "npm run build:admin && npm run build:widget && npm run build:backend",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "migrate:images": "tsx scripts/migrateExistingImages.ts"
+    "migrate:images": "tsx scripts/migrateExistingImages.ts",
+    "migrate:details": "tsx scripts/backfillStedDetails.ts"
   },
   "engines": {
     "node": ">=20.0.0"

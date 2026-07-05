@@ -61,12 +61,31 @@ export interface KartinstansInput {
 // Steder
 // ============================================
 
+// Åpningstidsperiode fra Google Places (opening_hours.periods)
+// day: 0 = søndag ... 6 = lørdag, time: "HHMM" (f.eks. "0900")
+export interface OpeningPeriodTime {
+  day: number;
+  time: string;
+}
+
+export interface OpeningPeriod {
+  open: OpeningPeriodTime;
+  close?: OpeningPeriodTime; // Mangler close = døgnåpent
+}
+
 export interface CachedPlaceData {
   navn: string;
   adresse: string;
   lat: number;
   lng: number;
   rating?: number;
+  telefon?: string;
+  nettside?: string;
+  apningstider?: string[]; // weekday_text fra Google, for visning
+  openingPeriods?: OpeningPeriod[]; // Maskinlesbar ukeplan, brukes til å beregne "åpen nå" lokalt
+  currentOpeningPeriods?: OpeningPeriod[]; // Faktiske tider neste ~7 dager (inkl. helligdager), gyldig kun kort tid etter henting
+  googleMapsUrl?: string;
+  photoReference?: string; // Google photo_reference, brukes som fallback hvis bildeCache mangler
   sisteOppdatering: Date;
 }
 
@@ -112,6 +131,13 @@ export interface StedDTO {
     lat: number;
     lng: number;
     rating?: number;
+    telefon?: string;
+    nettside?: string;
+    apningstider?: string[];
+    openingPeriods?: OpeningPeriod[];
+    currentOpeningPeriods?: OpeningPeriod[];
+    googleMapsUrl?: string;
+    photoReference?: string;
     sisteOppdatering: string;
   };
   bildeCache?: BildeCacheDTO; // Bildecache-data fra Cloud Storage

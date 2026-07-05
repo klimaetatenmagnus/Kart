@@ -180,15 +180,21 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           }
         }
 
-        // Lag fallback PlaceDetails fra cached data
+        // Lag PlaceDetails fra cached data - inneholder som regel alt
+        // (åpningstider, telefon, nettside) siden detaljene lagres i Firestore
         const cachedDetails: PlaceDetails = {
           placeId: sted.placeId,
           navn: sted.cachedData.navn,
           adresse: sted.cachedData.adresse,
           lat: sted.cachedData.lat,
           lng: sted.cachedData.lng,
-          rating: sted.cachedData.rating,
-          googleMapsUrl: `https://www.google.com/maps/place/?q=place_id:${sted.placeId}`,
+          rating: sted.cachedData.rating ?? undefined,
+          telefon: sted.cachedData.telefon ?? undefined,
+          nettside: sted.cachedData.nettside ?? undefined,
+          apningstider: sted.cachedData.apningstider ?? undefined,
+          googleMapsUrl:
+            sted.cachedData.googleMapsUrl ??
+            `https://www.google.com/maps/place/?q=place_id:${sted.placeId}`,
         }
 
         // Vis cached data med en gang
@@ -214,7 +220,11 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
               apningstider: place.apningstider,
               apenNa: place.apenNa,
               googleMapsUrl: place.googleMapsUrl || cachedDetails.googleMapsUrl,
-              bilder: place.bilder,
+              // Foto-proxy-URLer fra backend er relative - gjør dem absolutte
+              // mot API-et (widgeten serveres fra et annet origin)
+              bilder: place.bilder?.map((url: string) =>
+                url.startsWith('/') ? `${API_URL}${url}` : url
+              ),
             }
 
             // Oppdater med fullstendig data

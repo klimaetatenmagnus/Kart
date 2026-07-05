@@ -3,6 +3,7 @@ import { FieldValue } from '@google-cloud/firestore'
 import { stederCollection } from '../services/firestore.js'
 import { AuthenticatedRequest } from '../middleware/auth.js'
 import { cacheStedBilde, deleteStedBilde } from '../services/imageCache.js'
+import { fetchPlaceDetailsFromGoogle, buildCachedData } from '../services/placeDetails.js'
 import type { StedInput } from '@klimaoslo-kart/shared'
 
 interface StederRequest extends AuthenticatedRequest {
@@ -20,38 +21,6 @@ interface StedIdRequest extends AuthenticatedRequest {
 }
 
 export const stederRouter = Router({ mergeParams: true })
-
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || ''
-
-// Hent stedsdetaljer fra Google Places API
-async function fetchPlaceDetails(placeId: string): Promise<{
-  navn: string;
-  adresse: string;
-  lat: number;
-  lng: number;
-  rating: number | null;
-  photoReference?: string;
-}> {
-  try {
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,rating,photos&key=${GOOGLE_PLACES_API_KEY}`
-    )
-    const data = await response.json()
-    const place = data.result
-
-    return {
-      navn: place?.name || '',
-      adresse: place?.formatted_address || '',
-      lat: place?.geometry?.location?.lat || 0,
-      lng: place?.geometry?.location?.lng || 0,
-      rating: place?.rating ?? null,
-      photoReference: place?.photos?.[0]?.photo_reference,
-    }
-  } catch (err) {
-    console.error('Error fetching place details:', err)
-    return { navn: '', adresse: '', lat: 0, lng: 0, rating: null }
-  }
-}
 
 // Hent alle steder for en kartinstans
 stederRouter.get('/', async (req: StederRequest, res: Response) => {
@@ -83,8 +52,15 @@ stederRouter.post('/', async (req: StederRequest, res: Response) => {
     const createdSteder: unknown[] = []
     const now = new Date()
 
-    // Hent detaljer for alle steder parallelt
-    const detailsPromises = stederInput.map(s => fetchPlaceDetails(s.placeId))
+    // Hent fullstendige detaljer (inkl. åpningstider og kontaktinfo) for alle
+    // steder parallelt - lagres i Firestore slik at kartwidgeten aldri trenger
+    // å spørre Google for disse stedene
+    const detailsPromises = stederInput.map(s =>
+      fetchPlaceDetailsFromGoogle(s.placeId).catch((err) => {
+        console.error(`Error fetching place details for ${s.placeId}:`, err)
+        return null
+      })
+    )
     const allDetails = await Promise.all(detailsPromises)
 
     const batch = stederCollection.firestore.batch()
@@ -97,14 +73,9 @@ stederRouter.post('/', async (req: StederRequest, res: Response) => {
       const sted: Record<string, unknown> = {
         kartinstansId: slug,
         placeId: stedInput.placeId,
-        cachedData: {
-          navn: details.navn,
-          adresse: details.adresse,
-          lat: details.lat,
-          lng: details.lng,
-          rating: details.rating,
-          sisteOppdatering: now,
-        },
+        cachedData: details
+          ? buildCachedData(details)
+          : { navn: '', adresse: '', lat: 0, lng: 0, rating: null, sisteOppdatering: now },
         opprettet: now,
         opprettetAv: req.user?.email || 'unknown',
       }
@@ -118,7 +89,7 @@ stederRouter.post('/', async (req: StederRequest, res: Response) => {
       }
 
       // Cache bildet hvis stedet har bilder
-      if (details.photoReference) {
+      if (details?.photoReference) {
         try {
           const bildeCache = await cacheStedBilde(stedInput.placeId, details.photoReference)
           sted.bildeCache = bildeCache

@@ -85,32 +85,16 @@ export function TipsModal({ kartinstansId, kategorier, onClose }: TipsModalProps
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Select a suggestion and fetch details
-  const selectSuggestion = async (suggestion: AutocompleteSuggestion) => {
+  // Select a suggestion - autocomplete-svaret inneholder allerede navn og
+  // adresse, så vi trenger ikke hente fulle stedsdetaljer fra Google
+  const selectSuggestion = (suggestion: AutocompleteSuggestion) => {
     setShowSuggestions(false)
     setSearchQuery(suggestion.hovedtekst)
-    setLoadingSuggestions(true)
-
-    try {
-      const response = await fetch(
-        `${API_URL}/api/public/places/details?placeId=${suggestion.placeId}`
-      )
-      if (!response.ok) throw new Error('Kunne ikke hente stedsdetaljer')
-      const data = await response.json()
-
-      if (data.data) {
-        setSelectedPlace({
-          placeId: data.data.placeId,
-          navn: data.data.navn,
-          adresse: data.data.adresse,
-        })
-      }
-    } catch (err) {
-      console.error('Error fetching place details:', err)
-      setErrorMessage('Kunne ikke hente stedsdetaljer')
-    } finally {
-      setLoadingSuggestions(false)
-    }
+    setSelectedPlace({
+      placeId: suggestion.placeId,
+      navn: suggestion.hovedtekst,
+      adresse: suggestion.sekundartekst || suggestion.beskrivelse,
+    })
   }
 
   const clearSelectedPlace = () => {

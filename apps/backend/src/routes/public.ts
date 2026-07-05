@@ -2,7 +2,21 @@ import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { kartinstanserCollection, stederCollection, tipsCollection } from '../services/firestore.js'
 import { ApiCache } from '../services/apiCache.js'
-import type { TipsInput } from '@klimaoslo-kart/shared'
+import {
+  buildCachedData,
+  computeOpenNow,
+  fetchPlaceDetailsFromGoogle,
+  hasFullDetails,
+  isDetailsStale,
+  pickOpeningPeriods,
+  refreshStedDetails,
+  scheduleBackgroundRefresh,
+} from '../services/placeDetails.js'
+import {
+  getProxiedPhotoFromStorage,
+  saveProxiedPhotoToStorage,
+} from '../services/imageCache.js'
+import type { TipsInput, BildeCacheDTO } from '@klimaoslo-kart/shared'
 
 export const publicRouter = Router()
 
@@ -31,20 +45,57 @@ const OSLO_CENTER_LAT = 59.9139
 const OSLO_CENTER_LNG = 10.7522
 const OSLO_SEARCH_RADIUS = 15000 // 15 km dekker det meste av Oslo
 
-// Server-side cacher for å redusere Google API-kall og kostnader
-// Place Details: 30 minutter (statiske data som adresse, telefon osv.)
+// In-memory L1-cacher. Merk: Cloud Run skalerer til null mellom besøk,
+// så disse er kun en rask snarvei innenfor en instans' levetid.
+// Varig caching skjer i Firestore (stedsdetaljer) og Cloud Storage (bilder).
+// Place Details-fallback for steder som IKKE finnes i noen kartinstans:
 const placeDetailsCache = new ApiCache<Record<string, unknown>>(30 * 60)
-// Åpen nå-status: 3 minutter (endres sjeldnere enn hvert 3. minutt)
-const openNowCache = new ApiCache<boolean | null>(3 * 60)
-// Foto-cache: 24 timer (bilder endres sjelden)
+// Foto: L1 foran Cloud Storage
 const photoCache = new ApiCache<{ buffer: Buffer; contentType: string }>(24 * 60 * 60)
 
 // Rydd opp utløpte cache-oppføringer hvert 10. minutt
 setInterval(() => {
   placeDetailsCache.cleanup()
-  openNowCache.cleanup()
   photoCache.cleanup()
 }, 10 * 60 * 1000)
+
+/**
+ * Bygg PlaceDetails-respons fra lagret Firestore-data.
+ * "Åpen nå" beregnes lokalt fra lagrede åpningstidsperioder - ingen Google-kall.
+ */
+function buildDetailsResponse(
+  placeId: string,
+  cachedData: Record<string, unknown>,
+  bildeCache?: BildeCacheDTO | null
+): Record<string, unknown> {
+  const periods = pickOpeningPeriods(cachedData)
+  const photoReference = cachedData.photoReference as string | null | undefined
+
+  // Foretrekk bildet som allerede ligger i Cloud Storage (gratis å servere),
+  // fall tilbake til foto-proxy kun hvis bildeCache mangler
+  let bilder: string[] | undefined
+  if (bildeCache?.url) {
+    bilder = [bildeCache.url]
+  } else if (photoReference) {
+    bilder = [`/api/public/places/photo?ref=${encodeURIComponent(photoReference)}&maxwidth=400`]
+  }
+
+  return {
+    placeId,
+    navn: cachedData.navn,
+    adresse: cachedData.adresse,
+    lat: cachedData.lat,
+    lng: cachedData.lng,
+    rating: cachedData.rating ?? undefined,
+    telefon: cachedData.telefon ?? undefined,
+    nettside: cachedData.nettside ?? undefined,
+    apningstider: cachedData.apningstider ?? undefined,
+    apenNa: computeOpenNow(periods) ?? undefined,
+    googleMapsUrl:
+      cachedData.googleMapsUrl ?? `https://www.google.com/maps/place/?q=place_id:${placeId}`,
+    bilder,
+  }
+}
 
 // Hent kartinstans (offentlig)
 publicRouter.get('/kartinstanser/:slug', async (req, res) => {
@@ -55,6 +106,7 @@ publicRouter.get('/kartinstanser/:slug', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Kartinstans ikke funnet' })
     }
 
+    res.set('Cache-Control', 'public, max-age=300')
     res.json({ success: true, data: { id: doc.id, ...doc.data() } })
   } catch (err) {
     console.error('Error fetching kartinstans:', err)
@@ -75,6 +127,7 @@ publicRouter.get('/kartinstanser/:slug/steder', async (req, res) => {
       ...doc.data(),
     }))
 
+    res.set('Cache-Control', 'public, max-age=300')
     res.json({ success: true, data: steder })
   } catch (err) {
     console.error('Error fetching steder:', err)
@@ -125,7 +178,9 @@ publicRouter.get('/places/autocomplete', placesRateLimiter, async (req, res) => 
   }
 })
 
-// Place Details for infoboks og tips-skjema (offentlig, rate limited)
+// Place Details for infoboks (offentlig, rate limited)
+// Steder som finnes i et kart serveres fra Firestore (ingen Google-kall);
+// utdaterte data oppdateres i bakgrunnen (stale-while-revalidate).
 publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
   try {
     const { placeId } = req.query
@@ -136,46 +191,71 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
 
     const placeIdStr = String(placeId)
 
-    // Sjekk cache først
+    // 1) Sted i et av kartene: server fra Firestore
+    const snapshot = await stederCollection.where('placeId', '==', placeIdStr).limit(1).get()
+
+    if (!snapshot.empty) {
+      const stedData = snapshot.docs[0].data()
+      let cachedData = stedData.cachedData as Record<string, unknown> | undefined
+
+      if (!hasFullDetails(cachedData)) {
+        // Gammelt dataformat uten detaljer: hent fra Google én gang og lagre,
+        // slik at alle senere forespørsler er gratis. Feiler Google, serverer
+        // vi likevel det vi har (navn, adresse, posisjon) fra Firestore.
+        try {
+          const details = await refreshStedDetails(placeIdStr)
+          if (details) {
+            cachedData = buildCachedData(details, cachedData)
+          }
+        } catch (refreshErr) {
+          console.warn(`Kunne ikke hente detaljer fra Google for ${placeIdStr}:`, refreshErr)
+        }
+      } else if (isDetailsStale(cachedData)) {
+        scheduleBackgroundRefresh(placeIdStr)
+      }
+
+      if (cachedData) {
+        res.set('Cache-Control', 'public, max-age=300')
+        return res.json({
+          success: true,
+          data: buildDetailsResponse(placeIdStr, cachedData, stedData.bildeCache),
+        })
+      }
+    }
+
+    // 2) Ukjent sted (ikke i noen kartinstans): Google med in-memory cache
     const cached = placeDetailsCache.get(placeIdStr)
     if (cached) {
+      res.set('Cache-Control', 'public, max-age=300')
       return res.json({ success: true, data: cached })
     }
 
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeIdStr}&fields=name,formatted_address,geometry,opening_hours,formatted_phone_number,website,photos,rating,url&key=${GOOGLE_PLACES_API_KEY}`
-    )
+    const details = await fetchPlaceDetailsFromGoogle(placeIdStr)
 
-    const data = await response.json()
-    const place = data.result
-
-    if (!place) {
+    if (!details) {
       return res.status(404).json({ success: false, error: 'Sted ikke funnet' })
     }
 
-    // Generer proxy-URLer for bilder (skjuler API-nøkkelen fra klienten)
-    const bilder = place.photos?.map((photo: { photo_reference: string }) =>
-      `/api/public/places/photo?ref=${encodeURIComponent(photo.photo_reference)}&maxwidth=400`
-    )
-
     const result: Record<string, unknown> = {
       placeId: placeIdStr,
-      navn: place.name,
-      adresse: place.formatted_address,
-      lat: place.geometry?.location?.lat,
-      lng: place.geometry?.location?.lng,
-      rating: place.rating,
-      telefon: place.formatted_phone_number,
-      nettside: place.website,
-      apningstider: place.opening_hours?.weekday_text,
-      apenNa: place.opening_hours?.open_now,
-      googleMapsUrl: place.url,
-      bilder,
+      navn: details.navn,
+      adresse: details.adresse,
+      lat: details.lat,
+      lng: details.lng,
+      rating: details.rating ?? undefined,
+      telefon: details.telefon ?? undefined,
+      nettside: details.nettside ?? undefined,
+      apningstider: details.apningstider ?? undefined,
+      apenNa: computeOpenNow(details.openingPeriods) ?? undefined,
+      googleMapsUrl: details.googleMapsUrl ?? undefined,
+      bilder: details.photoReference
+        ? [`/api/public/places/photo?ref=${encodeURIComponent(details.photoReference)}&maxwidth=400`]
+        : undefined,
     }
 
-    // Cache resultatet
     placeDetailsCache.set(placeIdStr, result)
 
+    res.set('Cache-Control', 'public, max-age=300')
     res.json({ success: true, data: result })
   } catch (err) {
     console.error('Error fetching place details:', err)
@@ -183,70 +263,107 @@ publicRouter.get('/places/details', placesRateLimiter, async (req, res) => {
   }
 })
 
-// Batch-sjekk av åpen nå-status for flere steder (offentlig, rate limited)
-// Brukes av "Åpen nå"-filteret for å hente faktisk status på tidspunktet filteret aktiveres
+// Batch-sjekk av åpen nå-status for steder i en kartinstans (offentlig, rate limited)
+// Status beregnes lokalt fra åpningstider lagret i Firestore - ingen Google-kall
+// i normal drift, uansett trafikkvolum. Beregningen skjer i sanntid ved hver
+// forespørsel, så statusen er alltid fersk.
 publicRouter.get('/places/open-now-batch', placesRateLimiter, async (req, res) => {
   try {
-    const { placeIds } = req.query
+    const { slug, placeIds } = req.query
 
-    if (!placeIds || typeof placeIds !== 'string') {
-      return res.status(400).json({ success: false, error: 'Mangler placeIds-parameter' })
+    let docs
+    if (slug && typeof slug === 'string') {
+      // Foretrukket: hent alle steder i kartinstansen med én Firestore-spørring
+      const snapshot = await stederCollection.where('kartinstansId', '==', slug).get()
+      docs = snapshot.docs
+    } else if (placeIds && typeof placeIds === 'string') {
+      // Bakoverkompatibilitet med eldre widget-versjoner som sender placeIds
+      const ids = placeIds.split(',').filter((id) => id.trim())
+
+      if (ids.length === 0) {
+        return res.json({ success: true, data: {} })
+      }
+      if (ids.length > 50) {
+        return res.status(400).json({
+          success: false,
+          error: 'For mange steder. Maks 50 per forespørsel.',
+        })
+      }
+
+      // Firestore 'in'-spørringer tar maks 30 verdier - del opp
+      docs = []
+      for (let i = 0; i < ids.length; i += 30) {
+        const chunk = ids.slice(i, i + 30)
+        const snapshot = await stederCollection.where('placeId', 'in', chunk).get()
+        docs.push(...snapshot.docs)
+      }
+    } else {
+      return res.status(400).json({ success: false, error: 'Mangler slug- eller placeIds-parameter' })
     }
 
-    const ids = placeIds.split(',').filter(id => id.trim())
-
-    if (ids.length === 0) {
-      return res.json({ success: true, data: {} })
-    }
-
-    // Begrens antall steder per forespørsel for å unngå overbelastning
-    if (ids.length > 50) {
-      return res.status(400).json({
-        success: false,
-        error: 'For mange steder. Maks 50 per forespørsel.'
-      })
-    }
-
-    // Sjekk cache og finn hvilke som trenger fersk data
     const statusMap: Record<string, boolean | null> = {}
-    const uncachedIds: string[] = []
+    const needsBackfill = new Set<string>()
 
-    for (const id of ids) {
-      const cached = openNowCache.get(id)
-      if (cached !== null) {
-        statusMap[id] = cached
+    for (const doc of docs) {
+      const data = doc.data()
+      const placeIdValue = data.placeId as string | undefined
+      if (!placeIdValue) continue // defekte dokumenter uten placeId
+
+      const cachedData = data.cachedData as Record<string, unknown> | undefined
+
+      if (!hasFullDetails(cachedData)) {
+        // Gammelt dataformat uten åpningstider - må hentes fra Google én gang
+        needsBackfill.add(placeIdValue)
+        statusMap[placeIdValue] = null
       } else {
-        uncachedIds.push(id)
+        statusMap[placeIdValue] = computeOpenNow(pickOpeningPeriods(cachedData))
+        if (isDetailsStale(cachedData)) {
+          scheduleBackgroundRefresh(placeIdValue)
+        }
       }
     }
 
-    // Hent åpen/lukket-status kun for steder som ikke er cachet
-    if (uncachedIds.length > 0) {
+    // Førstegangs-backfill for steder uten lagrede åpningstider: hent synkront
+    // så filteret gir riktig svar med en gang. Hvert sted backfilles maks én
+    // gang (også når Google ikke svarer - da settes et negativt cache-merke i
+    // refreshStedDetails), og antallet per forespørsel er begrenset. Steder
+    // over grensen får status ved neste forespørsel eller via migrate:details.
+    const MAX_BACKFILL_PER_REQUEST = 25
+    if (needsBackfill.size > 0) {
+      const toBackfill = [...needsBackfill].slice(0, MAX_BACKFILL_PER_REQUEST)
+      if (needsBackfill.size > toBackfill.length) {
+        console.warn(
+          `open-now-batch: ${needsBackfill.size - toBackfill.length} steder over backfill-grensen, tas ved neste forespørsel`
+        )
+      }
       const results = await Promise.all(
-        uncachedIds.map(async (placeId) => {
+        toBackfill.map(async (id) => {
           try {
-            const response = await fetch(
-              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=opening_hours&key=${GOOGLE_PLACES_API_KEY}`
-            )
-            const data = await response.json()
-
-            // open_now er beregnet av Google basert på nåværende tidspunkt
-            const isOpen = data.result?.opening_hours?.open_now ?? null
-            // Cache resultatet
-            openNowCache.set(placeId, isOpen)
-            return { placeId, isOpen }
+            const details = await refreshStedDetails(id)
+            return { id, periods: details?.currentOpeningPeriods ?? details?.openingPeriods ?? null }
           } catch {
-            // Returnerer null hvis vi ikke får svar, så stedet vises uansett
-            return { placeId, isOpen: null }
+            return { id, periods: null }
           }
         })
       )
-
       for (const result of results) {
-        statusMap[result.placeId] = result.isOpen
+        statusMap[result.id] = computeOpenNow(result.periods)
       }
     }
 
+    // Gamle widget-versjoner forventer en nøkkel per forespurt placeId -
+    // fyll inn null (ukjent) for IDer som ikke lenger finnes i Firestore
+    if (!slug && placeIds && typeof placeIds === 'string') {
+      for (const id of placeIds.split(',')) {
+        const trimmed = id.trim()
+        if (trimmed && !(trimmed in statusMap)) {
+          statusMap[trimmed] = null
+        }
+      }
+    }
+
+    // Kort browser-cache: reduserer kall ved rask av/på-toggling av filteret
+    res.set('Cache-Control', 'public, max-age=60')
     res.json({ success: true, data: statusMap })
   } catch (err) {
     console.error('Error fetching open-now batch:', err)
@@ -254,8 +371,10 @@ publicRouter.get('/places/open-now-batch', placesRateLimiter, async (req, res) =
   }
 })
 
-// Foto-proxy: serverer Google Places-bilder uten å eksponere API-nøkkelen
-// Cacher bilder i minne (24 timer) + browser-cache (7 dager) for å minimere API-kall
+// Foto-proxy: serverer Google Places-bilder uten å eksponere API-nøkkelen.
+// Cache-lag: minne (L1, per instans) -> Cloud Storage (delt, overlever
+// nedskalering) -> Google Photo API. Hvert unike bilde hentes dermed fra
+// Google maks én gang per 30 dager, globalt.
 publicRouter.get('/places/photo', placesRateLimiter, async (req, res) => {
   try {
     const { ref, maxwidth } = req.query
@@ -264,10 +383,14 @@ publicRouter.get('/places/photo', placesRateLimiter, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Mangler ref-parameter' })
     }
 
-    const width = Number(maxwidth) || 400
+    // Kun godkjente bredder: hindrer at vilkårlige maxwidth-verdier omgår
+    // cachene og utløser ett Google-kall + ett lagringsobjekt per unike verdi
+    const ALLOWED_WIDTHS = [400, 800]
+    const requestedWidth = Number(maxwidth)
+    const width = ALLOWED_WIDTHS.includes(requestedWidth) ? requestedWidth : 400
     const cacheKey = `${ref}_${width}`
 
-    // Sjekk server-side cache først
+    // L1: in-memory
     const cached = photoCache.get(cacheKey)
     if (cached) {
       res.set('Cache-Control', 'public, max-age=604800')
@@ -275,6 +398,16 @@ publicRouter.get('/places/photo', placesRateLimiter, async (req, res) => {
       return res.send(cached.buffer)
     }
 
+    // L2: Cloud Storage
+    const stored = await getProxiedPhotoFromStorage(ref, width)
+    if (stored) {
+      photoCache.set(cacheKey, stored)
+      res.set('Cache-Control', 'public, max-age=604800')
+      res.set('Content-Type', stored.contentType)
+      return res.send(stored.buffer)
+    }
+
+    // L3: Google Photo API (koster penger - skal være sjelden)
     const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${width}&photo_reference=${encodeURIComponent(ref)}&key=${GOOGLE_PLACES_API_KEY}`
     const response = await fetch(photoUrl)
 
@@ -285,8 +418,15 @@ publicRouter.get('/places/photo', placesRateLimiter, async (req, res) => {
     const buffer = Buffer.from(await response.arrayBuffer())
     const contentType = response.headers.get('content-type') || 'image/jpeg'
 
-    // Cache i minne i 24 timer
     photoCache.set(cacheKey, { buffer, contentType })
+
+    // Skriv til Cloud Storage før respons sendes - Cloud Run gir ikke garantert
+    // CPU etter at responsen er levert. Feil her skal ikke stoppe bildevisning.
+    try {
+      await saveProxiedPhotoToStorage(ref, width, buffer, contentType)
+    } catch (storageErr) {
+      console.warn('Kunne ikke lagre proxiet bilde i Cloud Storage:', storageErr)
+    }
 
     // Sett cache-headers slik at browseren cacher bildet i 7 dager
     res.set('Cache-Control', 'public, max-age=604800')

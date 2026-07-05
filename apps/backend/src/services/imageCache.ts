@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { Storage } from '@google-cloud/storage'
 import type { BildeCache } from '@klimaoslo-kart/shared'
 
@@ -87,6 +88,58 @@ export function isBildeCacheExpired(bildeCache: BildeCache): boolean {
   const now = new Date()
   const utloper = new Date(bildeCache.utloper)
   return now > utloper
+}
+
+// ============================================
+// Foto-proxy-cache i Cloud Storage
+// Deles på tvers av Cloud Run-instanser og overlever nedskalering til null,
+// slik at hvert unike bilde hentes fra Google maks én gang per lagringsperiode.
+// ============================================
+
+// photo_reference kan være svært lang - bruk hash som filnavn
+function photoProxyPath(photoReference: string, width: number): string {
+  const hash = createHash('sha256').update(photoReference).digest('hex')
+  return `fotoproxy/${hash}_w${width}`
+}
+
+export interface ProxiedPhoto {
+  buffer: Buffer
+  contentType: string
+}
+
+/** Hent proxiet bilde fra Cloud Storage, eller null hvis det ikke finnes */
+export async function getProxiedPhotoFromStorage(
+  photoReference: string,
+  width: number
+): Promise<ProxiedPhoto | null> {
+  const file = storage.bucket(BUCKET_NAME).file(photoProxyPath(photoReference, width))
+  try {
+    const [buffer] = await file.download()
+    const [metadata] = await file.getMetadata()
+    return {
+      buffer,
+      contentType: (metadata.contentType as string) || 'image/jpeg',
+    }
+  } catch {
+    // Finnes ikke (eller utilgjengelig) - behandles som cache-miss
+    return null
+  }
+}
+
+/** Lagre proxiet bilde i Cloud Storage */
+export async function saveProxiedPhotoToStorage(
+  photoReference: string,
+  width: number,
+  buffer: Buffer,
+  contentType: string
+): Promise<void> {
+  const file = storage.bucket(BUCKET_NAME).file(photoProxyPath(photoReference, width))
+  await file.save(buffer, {
+    metadata: {
+      contentType,
+      cacheControl: 'public, max-age=2592000', // 30 dager
+    },
+  })
 }
 
 /**

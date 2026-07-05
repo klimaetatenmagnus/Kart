@@ -95,19 +95,18 @@ function App() {
   }, [steder, kartinstans?.kategorier, selectedCategories, openNowFilter, openNowStatus])
 
   // Håndter endring av "Åpen nå"-filter
-  // Henter faktisk åpen-status fra Google Places API når filteret aktiveres
+  // Backend beregner status i sanntid fra lagrede åpningstider (ingen Google-kall)
   const handleOpenNowChange = useCallback(async (enabled: boolean) => {
     setOpenNowFilter(enabled)
 
     if (enabled) {
-      // Hent status for alle steder når filteret aktiveres
-      // Dette sikrer at vi alltid bruker tidspunktet brukeren aktiverer filteret
-      await fetchOpenNowStatus(steder, true) // forceRefresh = true for fersk data
+      // Hent status for alle steder i kartinstansen når filteret aktiveres
+      await fetchOpenNowStatus(slug, steder)
     } else {
-      // Tøm status når filteret deaktiveres
+      // Skjul status når filteret deaktiveres
       clearStatus()
     }
-  }, [steder, fetchOpenNowStatus, clearStatus])
+  }, [slug, steder, fetchOpenNowStatus, clearStatus])
 
   // Filtrer steder for sidebar basert på valgt område
   const sidebarSteder = selectedArea

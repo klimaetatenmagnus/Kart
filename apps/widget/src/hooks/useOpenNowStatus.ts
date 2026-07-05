@@ -3,8 +3,10 @@ import type { StedDTO } from '@klimaoslo-kart/shared'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-// Cache varighet i millisekunder (5 minutter)
-// Status oppdateres automatisk når brukeren slår filteret av og på igjen
+// Cache varighet i millisekunder (5 minutter).
+// Backend beregner status i sanntid fra lagrede åpningstider, så en ny
+// henting er billig - cachen finnes bare for å unngå unødige kall ved
+// rask av/på-toggling av filteret.
 const CACHE_DURATION_MS = 5 * 60 * 1000
 
 interface OpenNowCache {
@@ -24,14 +26,14 @@ interface UseOpenNowStatusReturn {
   isLoading: boolean
 
   /**
-   * Hent åpen nå-status for gitte steder.
+   * Hent åpen nå-status for alle steder i kartinstansen.
    * Kalles når brukeren aktiverer "Åpen nå"-filteret.
    * Bruker cache hvis data er fersk nok, ellers hentes ny data.
    */
-  fetchOpenNowStatus: (steder: StedDTO[], forceRefresh?: boolean) => Promise<void>
+  fetchOpenNowStatus: (slug: string, steder: StedDTO[]) => Promise<void>
 
   /**
-   * Tøm cache og status
+   * Skjul status (beholder cachen, så re-aktivering innen 5 min er gratis)
    */
   clearStatus: () => void
 }
@@ -39,20 +41,19 @@ interface UseOpenNowStatusReturn {
 /**
  * Hook for å hente og cache "åpen nå"-status for steder.
  *
- * Denne hooken sikrer at vi alltid henter status på det faktiske tidspunktet
- * brukeren aktiverer filteret, slik at filtreringen er pålitelig.
+ * Statusen beregnes av backend ut fra åpningstider lagret i Firestore,
+ * i sanntid ved hver forespørsel - ingen Google API-kall er involvert.
  */
 export function useOpenNowStatus(): UseOpenNowStatusReturn {
   const [openNowStatus, setOpenNowStatus] = useState<Map<string, boolean | null>>(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const cacheRef = useRef<OpenNowCache | null>(null)
 
-  const fetchOpenNowStatus = useCallback(async (steder: StedDTO[], forceRefresh = false) => {
+  const fetchOpenNowStatus = useCallback(async (slug: string, steder: StedDTO[]) => {
     // Sjekk om cache er fersk nok
-    if (!forceRefresh && cacheRef.current) {
+    if (cacheRef.current) {
       const age = Date.now() - cacheRef.current.fetchedAt
       if (age < CACHE_DURATION_MS) {
-        // Bruk cached data
         setOpenNowStatus(cacheRef.current.status)
         return
       }
@@ -66,32 +67,17 @@ export function useOpenNowStatus(): UseOpenNowStatusReturn {
     setIsLoading(true)
 
     try {
-      // Hent alle place IDs
-      const placeIds = steder.map((s) => s.placeId)
-
-      // Del opp i batches på 50 (API-begrensning)
-      const batches: string[][] = []
-      for (let i = 0; i < placeIds.length; i += 50) {
-        batches.push(placeIds.slice(i, i + 50))
-      }
-
-      // Hent status for alle batches parallelt
-      const results = await Promise.all(
-        batches.map(async (batch) => {
-          const response = await fetch(
-            `${API_URL}/api/public/places/open-now-batch?placeIds=${batch.join(',')}`
-          )
-          const data = await response.json()
-          return data.success ? data.data : {}
-        })
+      // Én forespørsel per kartinstans - backend henter stedene fra Firestore
+      // og beregner status for alle i samme slengen
+      const response = await fetch(
+        `${API_URL}/api/public/places/open-now-batch?slug=${encodeURIComponent(slug)}`
       )
+      const data = await response.json()
+      const result: Record<string, boolean | null> = data.success ? data.data : {}
 
-      // Kombiner resultater til ett map
       const statusMap = new Map<string, boolean | null>()
-      for (const result of results) {
-        for (const [placeId, isOpen] of Object.entries(result)) {
-          statusMap.set(placeId, isOpen as boolean | null)
-        }
+      for (const [placeId, isOpen] of Object.entries(result)) {
+        statusMap.set(placeId, isOpen)
       }
 
       // Oppdater state og cache
@@ -114,8 +100,9 @@ export function useOpenNowStatus(): UseOpenNowStatusReturn {
   }, [])
 
   const clearStatus = useCallback(() => {
+    // Behold cacheRef: hvis brukeren slår filteret på igjen innen 5 minutter,
+    // gjenbrukes forrige svar uten nytt nettverkskall
     setOpenNowStatus(new Map())
-    cacheRef.current = null
   }, [])
 
   return {
