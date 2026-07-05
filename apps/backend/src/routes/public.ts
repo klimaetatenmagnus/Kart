@@ -383,6 +383,11 @@ publicRouter.get('/places/photo', placesRateLimiter, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Mangler ref-parameter' })
     }
 
+    // Bildene embeddes som <img> fra widget-origin (kart.klimaoslo.no) -
+    // overstyr helmets Cross-Origin-Resource-Policy: same-origin, som ellers
+    // får browseren til å blokkere responsen (ERR_BLOCKED_BY_RESPONSE)
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin')
+
     // Kun godkjente bredder: hindrer at vilkårlige maxwidth-verdier omgår
     // cachene og utløser ett Google-kall + ett lagringsobjekt per unike verdi
     const ALLOWED_WIDTHS = [400, 800]
