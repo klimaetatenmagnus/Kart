@@ -18,7 +18,8 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "migrate:images": "tsx scripts/migrateExistingImages.ts",
-    "migrate:details": "tsx scripts/backfillStedDetails.ts"
+    "migrate:details": "tsx scripts/backfillStedDetails.ts",
+    "migrate:tips": "tsx scripts/backfillTipsDetails.ts"
   },
   "engines": {
     "node": ">=20.0.0"

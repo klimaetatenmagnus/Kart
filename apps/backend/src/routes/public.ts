@@ -150,10 +150,12 @@ publicRouter.get('/places/autocomplete', placesRateLimiter, async (req, res) => 
       return res.status(400).json({ success: false, error: 'Søketekst er for lang (maks 100 tegn)' })
     }
 
+    // types=establishment: kun virksomheter, ikke rene adresser/gatenavn -
+    // ellers kan tips peke på en adresse uten butikknavn
     const response = await fetch(
       `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
         inputStr
-      )}&location=${OSLO_CENTER_LAT},${OSLO_CENTER_LNG}&radius=${OSLO_SEARCH_RADIUS}&strictbounds=true&components=country:no&key=${GOOGLE_PLACES_API_KEY}`
+      )}&types=establishment&location=${OSLO_CENTER_LAT},${OSLO_CENTER_LNG}&radius=${OSLO_SEARCH_RADIUS}&strictbounds=true&components=country:no&key=${GOOGLE_PLACES_API_KEY}`
     )
 
     const data = await response.json()
